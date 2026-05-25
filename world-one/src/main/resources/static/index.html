@@ -1,0 +1,4445 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World One</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230d0f18'/%3E%3Ccircle cx='16' cy='16' r='11' fill='none' stroke='%237c6ff7' stroke-width='1.8'/%3E%3Cellipse cx='16' cy='16' rx='5' ry='11' fill='none' stroke='%237c6ff7' stroke-width='1.2'/%3E%3Cline x1='5' y1='16' x2='27' y2='16' stroke='%237c6ff7' stroke-width='1.2'/%3E%3Cline x1='7' y1='10' x2='25' y2='10' stroke='%237c6ff7' stroke-width='1' stroke-dasharray='2 1.5'/%3E%3Cline x1='7' y1='22' x2='25' y2='22' stroke='%237c6ff7' stroke-width='1' stroke-dasharray='2 1.5'/%3E%3C/svg%3E">
+<style>
+:root {
+  --bg: #0d0f18; --surface: #13151f; --surface2: #1c1f2e; --surface3: #242840;
+  --border: #272b3e; --border2: #343850; --text: #d0d8f0; --text-dim: #6b7a9e;
+  --text-muted: #3d4460; --accent: #7c6ff7; --accent-h: #9a90ff;
+  --accent-glow: rgba(124,111,247,0.18); --danger: #ff4f6a; --success: #4fbf8f;
+  --active: rgba(124,111,247,0.14); --radius: 8px;
+  --funcbar-w: 48px; --panel-w: 220px; --chat-panel-w: 340px;
+  /* ── AIPP 标准 widget 主题变量（--aipp-* 命名空间） ──
+     host 默认将自身主题映射到这些变量，外部 widget 嵌入时直接读取即可 */
+  --aipp-bg:        var(--bg);
+  --aipp-surface:   var(--surface);
+  --aipp-text:      var(--text);
+  --aipp-text-dim:  var(--text-dim);
+  --aipp-border:    var(--border);
+  --aipp-accent:    var(--accent);
+  --aipp-font:      -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --aipp-font-size: 13px;
+  --aipp-radius:    var(--radius);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg); color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  height: 100vh; overflow: hidden; display: flex; flex-direction: column;
+}
+
+
+/* ── Topbar ── */
+.topbar {
+  height: 46px; background: var(--surface); border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; padding: 0 14px; gap: 10px; flex-shrink: 0; z-index: 10;
+}
+.brand { font-weight: 700; font-size: 15px; color: var(--accent); }
+.brand-sub { color: var(--text-dim); font-weight: 400; font-size: 12px; margin-left: 4px; }
+.topbar-spacer { flex: 1; }
+.mode-badge {
+  background: var(--surface3); border: 1px solid var(--border2);
+  border-radius: 20px; padding: 2px 10px; font-size: 11px; color: var(--text-dim); transition: all .3s;
+}
+body.canvas-mode .mode-badge { color: var(--accent); border-color: var(--accent); background: var(--accent-glow); }
+.topbar-btn {
+  background: none; border: 1px solid var(--border2); border-radius: var(--radius);
+  color: var(--text-dim); height: 30px; padding: 0 10px; cursor: pointer;
+  display: flex; align-items: center; gap: 5px; font-size: 12px; transition: all .15s;
+}
+.topbar-btn:hover { color: var(--text); border-color: var(--text-dim); }
+.topbar-btn.exit-canvas { display: none; }
+body.canvas-mode .topbar-btn.exit-canvas { display: flex; }
+.canvas-session-label { font-size: 11px; color: var(--text-muted); white-space: nowrap; vertical-align: middle; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+
+/* ── Workspace ── */
+.workspace { flex: 1; display: flex; overflow: hidden; }
+
+/* ══════════════════════════════════════
+   FUNCTION BAR — always 48px, never collapses
+   ══════════════════════════════════════ */
+.funcbar {
+  width: var(--funcbar-w); background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; justify-content: space-between;
+  flex-shrink: 0; z-index: 2;
+}
+.funcbar-top, .funcbar-bottom {
+  display: flex; flex-direction: column; align-items: center; padding: 8px 0; gap: 2px;
+}
+.funcbar-sep { height: 1px; background: var(--border); margin: 6px 10px; }
+.fb-btn {
+  width: 36px; height: 36px; border: none; background: none; border-radius: 8px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  color: var(--text-muted); transition: all .15s; position: relative;
+}
+.fb-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.fb-btn:hover { background: var(--surface2); color: var(--text-dim); }
+.fb-btn.active { background: var(--active); color: var(--accent); }
+.fb-btn.unconfigured { color: var(--danger); animation: pulse 2s infinite; }
+/* active indicator: left bar */
+.fb-btn.active::before {
+  content: ''; position: absolute; left: -1px; top: 8px; bottom: 8px;
+  width: 2px; background: var(--accent); border-radius: 0 2px 2px 0;
+}
+.user-badge {
+  width: 28px; height: 28px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), #5a4fd0);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; color: #fff; cursor: default; letter-spacing: 0;
+}
+
+/* ══════════════════════════════════════
+   TASK PANEL — collapsible, slides in/out
+   ══════════════════════════════════════ */
+.task-panel {
+  width: var(--panel-w); background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; flex-shrink: 0;
+  overflow: hidden; transition: width .2s ease;
+}
+.task-panel.collapsed { width: 0; border-right-color: transparent; }
+
+.panel-header {
+  height: 46px; display: flex; align-items: center; padding: 0 8px 0 12px;
+  gap: 6px; border-bottom: 1px solid var(--border); flex-shrink: 0; white-space: nowrap;
+}
+.panel-title {
+  font-size: 11px; font-weight: 600; color: var(--text-dim);
+  text-transform: uppercase; letter-spacing: .8px; flex: 1;
+}
+/* IntelliJ-style panel icon buttons — no bg/border by default, hover shows rect highlight */
+.panel-icon-btn {
+  background: none; border: none; border-radius: 4px;
+  color: var(--text-muted); width: 24px; height: 24px; padding: 0; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .12s, color .12s; flex-shrink: 0;
+}
+.panel-icon-btn:hover { background: var(--surface3); color: var(--text); }
+.panel-icon-btn svg {
+  width: 14px; height: 14px; fill: none;
+  stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;
+}
+
+.session-list { flex: 1; overflow-y: auto; padding: 6px 6px 6px; display: flex; flex-direction: column; }
+.session-list-spacer { flex: 1; min-height: 8px; }
+.history-groups { flex-shrink: 0; }
+
+.session-divider {
+  height: 1px; background: var(--border); margin: 6px 4px;
+}
+.section-label {
+  font-size: 9px; color: var(--text-muted); padding: 5px 8px 2px;
+  text-transform: uppercase; letter-spacing: .6px;
+}
+
+/* Collapsible history group header */
+.history-group-hd {
+  display: flex; align-items: center; gap: 4px; padding: 5px 8px 4px;
+  cursor: pointer; font-size: 9px; text-transform: uppercase; letter-spacing: .6px;
+  color: var(--text-muted); user-select: none; border-top: 1px solid var(--border);
+  margin-top: 2px;
+}
+.history-group-hd:hover { color: var(--text-dim); }
+.history-group-hd .hg-count {
+  font-size: 9px; background: var(--surface3); border-radius: 8px; padding: 0 4px;
+}
+.history-group-hd .hg-spacer { flex: 1; }
+.history-group-hd .hg-chevron { font-size: 10px; transition: transform .15s; }
+.history-group.open .hg-chevron { transform: rotate(0deg); }
+.history-group:not(.open) .hg-chevron { transform: rotate(-90deg); }
+.history-group-body { overflow: hidden; }
+.history-group:not(.open) .history-group-body { display: none; }
+
+/* Search + pagination inside completed group */
+.hg-search-row {
+  display: flex; gap: 4px; padding: 4px 7px;
+}
+.hg-search {
+  flex: 1; background: var(--surface2); border: 1px solid var(--border2); border-radius: 4px;
+  color: var(--text); font-size: 10.5px; padding: 3px 7px; outline: none;
+}
+.hg-search:focus { border-color: var(--accent); }
+.hg-pager {
+  display: flex; align-items: center; justify-content: center; gap: 4px;
+  padding: 3px 7px 5px; font-size: 10.5px; color: var(--text-muted);
+}
+.hg-pager-btn {
+  background: none; border: 1px solid var(--border2); border-radius: 3px;
+  color: var(--text-muted); cursor: pointer; padding: 1px 6px; font-size: 11px;
+  transition: all .1s;
+}
+.hg-pager-btn:hover:not(:disabled) { color: var(--accent); border-color: var(--accent); }
+.hg-pager-btn:disabled { opacity: .3; cursor: default; }
+
+.session-item {
+  padding: 6px 7px; border-radius: var(--radius); cursor: pointer;
+  font-size: 12px; color: var(--text-dim); transition: background .15s;
+  display: flex; align-items: center; gap: 6px; white-space: nowrap; overflow: hidden;
+  position: relative;
+}
+.session-item:hover { background: var(--surface2); }
+.session-item.active { background: var(--active); color: var(--text); }
+/* Archived sessions: clickable to view, slightly dimmed */
+.session-item.archived-session { opacity: .65; }
+.session-item.archived-session:hover { background: var(--surface2); opacity: .85; }
+.session-icon { font-size: 13px; flex-shrink: 0; line-height: 1; }
+.session-label { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+.session-label-event {
+  display: flex; flex-direction: column; line-height: 1.35;
+  min-width: 0; flex: 1; overflow: hidden;
+}
+.session-label-event .event-primary,
+.session-label-event .event-secondary {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.session-label-event .event-secondary {
+  font-size: 10px; color: var(--text-muted);
+}
+
+.session-actions { display: none; gap: 2px; flex-shrink: 0; }
+.session-item:hover .session-actions { display: flex; }
+.sess-act {
+  background: none; border: none; cursor: pointer; color: var(--text-muted);
+  font-size: 11px; padding: 1px 3px; border-radius: 3px; transition: all .1s; line-height: 1;
+}
+.sess-act:hover { background: var(--surface3); color: var(--text); }
+.sess-act.ok:hover   { color: var(--success); }
+.sess-act.bad:hover  { color: var(--danger); }
+.sess-act.dim:hover  { color: var(--text-dim); }
+
+
+.panel-footer {
+  padding: 6px 8px; border-top: 1px solid var(--border); flex-shrink: 0;
+}
+.btn-show-all {
+  background: none; border: none; cursor: pointer; color: var(--text-muted);
+  font-size: 11px; padding: 4px 6px; border-radius: 5px; transition: all .15s;
+  width: 100%; text-align: left; white-space: nowrap;
+}
+.btn-show-all:hover { color: var(--text-dim); background: var(--surface2); }
+.btn-show-all.on { color: var(--text-dim); }
+
+/* ══════════════════════════════════════
+   RIGHT BAR — chat mode only, 48px placeholder
+   ══════════════════════════════════════ */
+.right-bar {
+  width: 48px; background: var(--surface); border-left: 1px solid var(--border);
+  flex-shrink: 0;
+}
+body.canvas-mode .right-bar { display: none; }
+
+/* ══════════════════════════════════════
+   CHAT MODE main area
+   ══════════════════════════════════════ */
+.chat-main {
+  flex: 1; display: flex; flex-direction: column; align-items: center; overflow: hidden;
+}
+body.canvas-mode .chat-main { display: none; }
+.chat-main .messages {
+  flex: 1; overflow-y: auto; width: 100%; max-width: 780px; padding: 24px 20px 8px;
+  display: flex; flex-direction: column; gap: 16px;
+}
+.chat-main .footer { width: 100%; max-width: 780px; padding: 10px 20px 24px; }
+
+/* ══════════════════════════════════════
+   CANVAS MODE areas
+   ══════════════════════════════════════ */
+.canvas-area { flex: 1; background: var(--bg); display: none; overflow: hidden; position: relative; }
+body.canvas-mode .canvas-area { display: flex; align-items: stretch; }
+
+.chat-side {
+  width: var(--chat-panel-w); background: var(--surface); border-left: 1px solid var(--border);
+  display: none; flex-direction: column; flex-shrink: 0;
+}
+body.canvas-mode .chat-side { display: flex; }
+.chat-side .side-header {
+  padding: 12px 14px 10px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.side-title { font-size: 13px; font-weight: 600; color: var(--text); }
+.side-sub   { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+.chat-side .messages {
+  flex: 1; overflow-y: auto; padding: 0; display: flex; flex-direction: column;
+}
+.chat-side .footer { padding: 8px 10px 12px; border-top: 1px solid var(--border); flex-shrink: 0; }
+
+/* ── Memory Manager Panel ── */
+/* Plan D: 通用 AIPP canvas 挂载模式 — 隐藏所有 legacy 面板。
+   legacy app-specific canvas CSS has been removed; AIPP-owned widgets ship
+   their own UI modules. */
+#aipp-canvas-mount { display: none; }
+body.aipp-canvas-mode #aipp-canvas-mount { display: flex; flex: 1; min-width: 0; min-height: 0; align-self: stretch; }
+
+/* App-specific widget styles are owned by their AIPP modules. */
+.mem-type-bar {
+  display: none;
+}
+/* ── Canvas 侧边：紧凑无头像消息布局 ── */
+.chat-side .msg { flex-direction: column; gap: 0; }
+.chat-side .msg-avatar { display: none; }
+/* 用户问题：白色文本 + 底部分割线 */
+.chat-side .msg.user .msg-bubble {
+  background: none; color: #ffffff; border-radius: 0;
+  border-bottom: 1px solid rgba(255,255,255,.1);
+  padding: 10px 14px 11px; max-width: 100%; font-size: 12.5px; font-weight: 500;
+}
+/* AI 回答：白色文本，无气泡背景 */
+.chat-side .msg.assistant .msg-bubble {
+  background: none; color: var(--text); border-radius: 0;
+  padding: 8px 14px 12px; max-width: 100%; font-size: 12.5px;
+}
+.chat-side .msg.system .msg-bubble { max-width: 100%; margin: 6px 10px; border-radius: 6px; }
+/* canvas 侧边关闭 p 底部 margin，更紧凑 */
+.chat-side .msg-bubble p { margin-bottom: 3px; }
+
+/* ── Shared message styles ── */
+.msg { display: flex; gap: 7px; align-items: flex-start; }
+.msg.user { flex-direction: row-reverse; }
+.msg-avatar {
+  width: 26px; height: 26px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 700; flex-shrink: 0; margin-top: 2px;
+}
+.msg.user      .msg-avatar { background: var(--accent); color: #fff; }
+.msg.assistant .msg-avatar { background: var(--surface3); color: var(--text-dim); }
+.msg.system    .msg-avatar { background: rgba(79,191,143,.15); color: var(--success); }
+.msg-bubble { padding: 8px 12px; border-radius: 12px; font-size: 13px; line-height: 1.6; max-width: 520px; }
+.chat-side .msg-bubble { max-width: 260px; font-size: 12px; }
+.msg.user      .msg-bubble { background: var(--accent); color: #fff; border-bottom-right-radius: 4px; }
+.msg.assistant .msg-bubble { background: var(--surface2); color: var(--text); border-bottom-left-radius: 4px; }
+.msg.system    .msg-bubble { background: rgba(79,191,143,.06); border: 1px solid rgba(79,191,143,.15); color: var(--text-dim); font-size: 12px; }
+
+/* ── Typing dots ── */
+.typing-dot {
+  display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--text-dim); animation: blink 1.2s infinite; margin: 0 2px;
+}
+.typing-dot:nth-child(2) { animation-delay: .2s; }
+.typing-dot:nth-child(3) { animation-delay: .4s; }
+@keyframes blink { 0%,80%,100%{opacity:.3} 40%{opacity:1} }
+
+/* ── Input row ── */
+.input-row { display: flex; gap: 7px; align-items: flex-end; }
+.chat-input {
+  flex: 1; background: var(--surface2); border: 1px solid var(--border2); border-radius: var(--radius);
+  color: var(--text); font-size: 14px; padding: 10px 13px; resize: none; font-family: inherit;
+  outline: none; min-height: 56px; max-height: 200px; transition: border-color .15s; line-height: 1.55;
+}
+/* canvas 侧边 chat 输入保持紧凑 */
+.chat-side .chat-input { font-size: 13px; padding: 8px 10px; min-height: 36px; max-height: 120px; }
+.chat-input:focus { border-color: var(--accent); }
+.chat-input::placeholder { color: var(--text-muted); }
+.chat-input:disabled {
+  opacity: .45; cursor: not-allowed; border-color: var(--border);
+}
+/* Read-only session notice bar */
+.readonly-notice {
+  font-size: 11px; color: var(--text-muted); text-align: center;
+  padding: 5px 10px; background: var(--surface); border-top: 1px solid var(--border);
+  flex-shrink: 0; display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+.readonly-delete-btn {
+  background: none; border: 1px solid rgba(255,79,106,.3); border-radius: 4px;
+  color: var(--danger); font-size: 11px; padding: 2px 8px; cursor: pointer; transition: all .1s;
+}
+.readonly-delete-btn:hover { background: rgba(255,79,106,.1); }
+
+.btn-action {
+  border: none; border-radius: var(--radius); width: 40px; height: 40px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all .15s;
+}
+/* chat-main 中的按钮跟随输入框底部对齐 */
+.chat-main .input-row { align-items: flex-end; }
+.btn-action.send { background: var(--accent); color: #fff; }
+.btn-action.send:hover:not(:disabled) { background: var(--accent-h); }
+.btn-action.send:disabled { opacity: .4; cursor: default; }
+.btn-action.stop { background: rgba(255,79,106,.15); border: 1px solid var(--danger); color: var(--danger); }
+.btn-action.stop:hover { background: rgba(255,79,106,.28); }
+.btn-action svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; }
+.btn-action.stop svg { width: 13px; height: 13px; fill: currentColor; stroke: none; }
+
+/* ── Welcome hint ── */
+.welcome-hint { text-align: center; padding: 52px 16px 24px; }
+.welcome-hint h2 { font-size: 26px; font-weight: 300; color: var(--text-dim); margin-bottom: 10px; }
+.welcome-hint p { font-size: 14px; color: var(--text-muted); margin-bottom: 20px; }
+.hint-chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.chip {
+  background: var(--surface2); border: 1px solid var(--border2); border-radius: 20px;
+  padding: 6px 14px; font-size: 12px; color: var(--text-dim); cursor: pointer; transition: all .15s;
+}
+.chip:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-glow); }
+
+/* ── AIPP sys.* Inline Card (in chat stream, canvas mode) ────────────── */
+.sys-inline-card {
+  background: var(--surface2); border: 1px solid var(--border2);
+  border-radius: var(--radius); padding: 12px 14px;
+  display: flex; flex-direction: column; gap: 8px;
+  max-width: 340px;
+}
+.sys-inline-card.danger { border-color: rgba(255,79,106,.35); }
+.sys-inline-title { font-size: 13px; font-weight: 600; color: var(--text); }
+.sys-inline-message {
+  font-size: 12px; color: var(--text-dim); line-height: 1.6;
+  white-space: pre-wrap;
+}
+.sys-inline-buttons { display: flex; gap: 7px; margin-top: 2px; }
+.sys-inline-btn {
+  padding: 5px 14px; border-radius: var(--radius); border: none;
+  font-size: 12px; font-weight: 500; cursor: pointer; transition: opacity .15s;
+}
+.sys-inline-btn:disabled { opacity: .4; cursor: default; }
+.sys-inline-btn:hover:not(:disabled) { opacity: .85; }
+.sys-inline-btn.primary   { background: var(--accent);  color: #fff; }
+.sys-inline-btn.danger    { background: var(--danger);  color: #fff; }
+.sys-inline-btn.secondary { background: var(--surface3); color: var(--text-dim); border: 1px solid var(--border); }
+.sys-inline-done { font-size: 12px; color: var(--text-dim); font-style: italic; }
+.runtime-card-meta {
+  font-size: 11px; color: var(--text-dim); line-height: 1.6; white-space: pre-wrap;
+}
+.runtime-card-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 2px; }
+
+/* ── AIPP System Widget Modal (sys.confirm / sys.alert / sys.prompt) ── */
+.sys-modal-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,.6); z-index: 2000;
+  align-items: center; justify-content: center;
+}
+.sys-modal-overlay.open { display: flex; }
+.sys-modal {
+  background: var(--surface2); border: 1px solid var(--border2);
+  border-radius: var(--radius-lg); padding: 24px 28px;
+  min-width: 320px; max-width: 480px; width: 90%;
+  box-shadow: 0 8px 40px rgba(0,0,0,.5);
+  display: flex; flex-direction: column; gap: 14px;
+}
+.sys-modal-title {
+  font-size: 15px; font-weight: 600; color: var(--text);
+}
+.sys-modal-message {
+  font-size: 13px; color: var(--text-dim); line-height: 1.6;
+  white-space: pre-wrap;
+}
+.sys-modal-input {
+  background: var(--surface3); border: 1px solid var(--border2);
+  border-radius: var(--radius); color: var(--text);
+  padding: 8px 12px; font-size: 13px; outline: none; width: 100%;
+  box-sizing: border-box;
+}
+.sys-modal-input:focus { border-color: var(--accent); }
+.sys-modal-buttons {
+  display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px;
+}
+.sys-modal-btn {
+  padding: 7px 18px; border-radius: var(--radius); border: none;
+  font-size: 13px; font-weight: 500; cursor: pointer; transition: opacity .15s;
+}
+.sys-modal-btn:hover { opacity: .85; }
+.sys-modal-btn.primary   { background: var(--accent);  color: #fff; }
+.sys-modal-btn.danger    { background: var(--danger);  color: #fff; }
+.sys-modal-btn.secondary { background: var(--surface3); color: var(--text-dim); border: 1px solid var(--border); }
+
+/* ── Settings overlay ── */
+.settings-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,.55);
+  z-index: 100; align-items: flex-start; justify-content: flex-end;
+}
+.settings-overlay.open { display: flex; }
+.settings-panel {
+  width: 380px; height: 100%; background: var(--surface); border-left: 1px solid var(--border);
+  display: flex; flex-direction: column; animation: slideIn .2s ease;
+}
+@keyframes slideIn { from { transform: translateX(40px); opacity:0 } to { transform:none; opacity:1 } }
+.settings-header {
+  padding: 16px 18px 14px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.settings-title { font-size: 14px; font-weight: 700; color: var(--text); }
+.btn-close-settings {
+  background: none; border: none; color: var(--text-dim); cursor: pointer;
+  font-size: 18px; line-height: 1; padding: 2px 6px; border-radius: 4px;
+}
+.btn-close-settings:hover { color: var(--text); background: var(--surface2); }
+.settings-body { flex: 1; overflow-y: auto; padding: 20px 18px; display: flex; flex-direction: column; gap: 18px; }
+.settings-section { font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+.form-group { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
+.form-label { font-size: 12px; color: var(--text-dim); font-weight: 500; }
+.form-input {
+  background: var(--surface2); border: 1px solid var(--border2); border-radius: var(--radius);
+  color: var(--text); font-size: 13px; padding: 8px 11px; outline: none;
+  font-family: inherit; width: 100%; transition: border-color .15s;
+}
+.form-input:focus { border-color: var(--accent); }
+.form-input::placeholder { color: var(--text-muted); }
+.form-hint { font-size: 11px; color: var(--text-muted); }
+.form-select {
+  background: var(--surface2); border: 1px solid var(--border2); border-radius: var(--radius);
+  color: var(--text); font-size: 13px; padding: 8px 11px; outline: none;
+  font-family: inherit; width: 100%; cursor: pointer;
+}
+.envvar-list { display: flex; flex-direction: column; gap: 10px; }
+.envvar-row {
+  border: 1px solid var(--border2);
+  background: var(--surface2);
+  border-radius: var(--radius);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.envvar-head {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 8px;
+  align-items: end;
+}
+.envvar-overrides { display: flex; flex-direction: column; gap: 6px; }
+.envvar-override-item {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+.btn-inline {
+  border: 1px solid var(--border2);
+  background: var(--surface3);
+  color: var(--text-dim);
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1;
+  padding: 7px 9px;
+  cursor: pointer;
+}
+.btn-inline:hover { color: var(--text); border-color: var(--accent); }
+.btn-inline.danger:hover { color: var(--danger); border-color: var(--danger); }
+.envvar-footer { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.envvar-empty { color: var(--text-muted); font-size: 12px; }
+.settings-footer { padding: 14px 18px 18px; border-top: 1px solid var(--border); display: flex; gap: 8px; }
+
+/* ── Apps Panel ───────────────────────────────────────────────────────── */
+.apps-panel {
+  position:fixed; left:52px; bottom:var(--apps-panel-bottom,54px); z-index:900;
+  width:220px;
+  max-height:calc(100vh - var(--apps-panel-bottom,54px) - 8px);
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--radius);
+  display:flex; flex-direction:column; overflow:hidden;
+  box-shadow:2px 4px 16px rgba(0,0,0,0.32);
+  transform:translateX(calc(-100% - 4px));
+  opacity:0; pointer-events:none;
+  transition:transform 0.22s cubic-bezier(0.4,0,0.2,1), opacity 0.18s;
+}
+.apps-panel.open { transform:translateX(0); opacity:1; pointer-events:all; }
+.apps-header { height:32px; display:flex; align-items:center; padding:0 12px; border-bottom:1px solid var(--border); flex-shrink:0; }
+.apps-title { font-size:10px; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:.8px; }
+.apps-body { flex:1; min-height:0; overflow-y:auto; }
+@keyframes spin { to { transform:rotate(360deg); } }
+
+/* ── HTML Widget (inline chat card, is_canvas_mode=false) ────────────── */
+.html-widget-msg { padding:4px 0; }
+.hw-spinner { width:20px; height:20px; border:2px solid var(--border2); border-top-color:var(--accent); border-radius:50%; animation:spin 0.7s linear infinite; }
+.btn-primary {
+  flex: 1; background: var(--accent); border: none; border-radius: var(--radius);
+  color: #fff; font-size: 13px; font-weight: 600; padding: 9px; cursor: pointer; transition: background .15s;
+}
+.btn-primary:hover { background: var(--accent-h); }
+.btn-secondary {
+  background: var(--surface2); border: 1px solid var(--border2); border-radius: var(--radius);
+  color: var(--text-dim); font-size: 13px; padding: 9px 14px; cursor: pointer; transition: all .15s; white-space: nowrap;
+}
+.btn-secondary:hover { color: var(--text); border-color: var(--text-dim); }
+.test-result {
+  padding: 8px 11px; border-radius: var(--radius); font-size: 12px; display: none; margin-top: 6px;
+}
+.test-result.ok   { background: rgba(100,200,100,.1); color: #7fbf7f; border: 1px solid rgba(100,200,100,.2); }
+.test-result.fail { background: rgba(255,80,100,.1); color: #ff8090; border: 1px solid rgba(255,80,100,.2); }
+.status-dot {
+  width: 7px; height: 7px; border-radius: 50%; display: inline-block; margin-right: 6px; background: var(--text-muted);
+}
+.status-dot.ok   { background: #7fbf7f; box-shadow: 0 0 5px #7fbf7f88; }
+.status-dot.fail { background: var(--danger); }
+
+/* ── Thinking block（推理过程，可折叠，灰色） ── */
+.thinking-block {
+  margin-bottom: 5px; border-left: 2px solid var(--border2);
+  padding: 3px 0 3px 8px;
+}
+.thinking-toggle {
+  cursor: pointer; display: inline-flex; align-items: center; gap: 5px;
+  color: var(--text-muted); font-size: 11px; user-select: none; background: none;
+  border: none; padding: 0; font-family: inherit; transition: color .15s;
+}
+.thinking-toggle:hover { color: var(--text-dim); }
+.thinking-toggle .th-chevron {
+  flex-shrink: 0; transition: transform .2s;
+}
+.thinking-toggle.open .th-chevron { transform: rotate(90deg); }
+.thinking-body {
+  display: none; color: var(--text-dim); font-size: 11px; line-height: 1.5;
+  margin-top: 4px; padding-right: 4px; overflow-wrap: break-word;
+}
+.thinking-body.visible { display: block; }
+/* 主聊天区 thinking 块稍宽松 */
+.full-messages .thinking-block { border-left-color: var(--accent); }
+.full-messages .thinking-toggle { color: var(--text-dim); font-size: 11.5px; }
+
+/* ── 实时进度指示器（live-progress 消息） ── */
+/* 复用 .msg.assistant 结构，canvas 模式下无头像 */
+.live-bubble {
+  display: flex; flex-direction: column; gap: 5px;
+  min-height: 28px;
+}
+/* 状态行：旋转 spinner + "处理中" label */
+.lp-status {
+  display: flex; align-items: center; gap: 6px;
+  color: var(--text-muted); font-size: 11.5px;
+}
+.lp-spinner {
+  width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0;
+  border: 1.5px solid var(--border2); border-top-color: var(--accent);
+  animation: lp-spin .7s linear infinite;
+}
+@keyframes lp-spin { to { transform: rotate(360deg); } }
+/* 工具调用 chip 容器 */
+.lp-tools {
+  display: flex; flex-wrap: wrap; gap: 4px;
+}
+.lp-tool-chip {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 10px; color: var(--text-dim);
+  background: var(--surface3); border: 1px solid var(--border2);
+  border-radius: 4px; padding: 2px 7px; white-space: nowrap;
+  animation: chip-in .2s ease;
+}
+@keyframes chip-in { from { opacity:0; transform:scale(.85); } to { opacity:1; transform:scale(1); } }
+.lp-tool-chip svg { color: var(--accent); flex-shrink: 0; }
+/* AIPP 注解标签（在工具 chip 前展示，标识当前使用的 AIPP） */
+.lp-aipp-badge {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 10px; color: var(--text-muted);
+  border-radius: 4px; padding: 2px 6px; white-space: nowrap;
+  letter-spacing: .3px; font-style: italic;
+  animation: chip-in .2s ease;
+}
+.lp-aipp-badge svg { color: var(--text-muted); flex-shrink: 0; }
+/* 思考预览区（推理模型专用，thinking 事件触发后显示） */
+.lp-thinking-preview {
+  display: none; color: var(--text-muted); font-size: 11px; line-height: 1.5;
+  max-height: 80px; overflow-y: auto; padding-right: 2px;
+  border-left: 2px solid var(--border2); padding-left: 7px;
+}
+.lp-thinking-preview.visible { display: block; }
+
+/* 主聊天区 live-progress 使用标准气泡 */
+.full-messages .msg.live-progress .msg-bubble {
+  background: var(--surface2); border-bottom-left-radius: 4px;
+}
+
+/* ── 流式文本容器 ── */
+.stream-text {
+  /* Keep the same typography model as finalized markdown to avoid layout jump on done. */
+  white-space: normal;
+  line-height: inherit;
+  word-break: break-word;
+}
+.stream-text.streaming::after {
+  content: '▋'; color: var(--accent); animation: cur-blink .6s steps(1) infinite;
+}
+/* mid-tool 叙述（被工具调用打断的流式文本）→ 转为灰色 thinking 风格，最终答案到达时移除 */
+.msg.assistant.thinking-roll .msg-bubble {
+  background: transparent; border: none; padding: 4px 0;
+}
+.msg.assistant.thinking-roll .stream-text {
+  color: var(--text-muted); font-size: 12px; font-style: italic; opacity: .85;
+}
+.msg.assistant.thinking-roll .stream-text::after { content: ''; }
+@keyframes cur-blink { 50% { opacity: 0; } }
+
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+
+/* ── Message body wrapper + action icons ── */
+.msg-body { display: flex; flex-direction: column; min-width: 0; }
+.msg.user      .msg-body { align-items: flex-end; }
+.msg.assistant .msg-body { align-items: flex-start; }
+.msg-actions {
+  display: flex; gap: 2px; opacity: 0; transition: opacity .12s;
+  padding: 2px 0 0;
+}
+.msg:hover .msg-actions { opacity: 1; }
+.msg-action-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px;
+  background: none; border: none; cursor: pointer;
+  color: var(--text-dim); border-radius: 4px;
+  transition: background .1s, color .1s;
+  padding: 0;
+}
+.msg-action-btn:hover { background: var(--surface3); color: var(--text); }
+.msg-action-btn svg { pointer-events: none; }
+.msg-edit-area {
+  background: var(--surface2); border: 1px solid var(--border2); border-radius: 8px;
+  padding: 6px 10px; color: var(--text); font-size: 13px; resize: none;
+  min-width: 180px; max-width: 440px; outline: none; line-height: 1.5;
+  font-family: inherit;
+}
+.msg-edit-area:focus { border-color: var(--accent); }
+/* Widget 消息右上角删除按钮 */
+.html-widget-msg { position: relative; }
+.widget-actions {
+  position: absolute; top: 6px; right: 6px;
+  display: flex; gap: 2px; opacity: 0; transition: opacity .12s;
+  z-index: 10;
+}
+.html-widget-msg:hover .widget-actions { opacity: 1; }
+/* 已处理卡片 */
+.widget-processed-msg .msg-body { padding: 0; }
+.widget-processed-card {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px; border-radius: 6px;
+  background: var(--surface2); border: 1px solid var(--border);
+  color: var(--text-dim); font-size: 12px;
+}
+.widget-processed-card svg { color: #4fbf8f; flex-shrink: 0; }
+
+/* ── Markdown 渲染样式（assistant/system 气泡）── */
+.msg-bubble p { margin: 0 0 6px; }
+.msg-bubble p:last-child { margin-bottom: 0; }
+.msg-bubble h1,.msg-bubble h2,.msg-bubble h3,.msg-bubble h4 {
+  font-weight: 700; margin: 8px 0 3px; line-height: 1.35; color: var(--text);
+}
+.msg-bubble h1 { font-size: 1.15em; }
+.msg-bubble h2 { font-size: 1.08em; }
+.msg-bubble h3,.msg-bubble h4 { font-size: 1em; }
+.msg-bubble ul,.msg-bubble ol { margin: 3px 0 5px 18px; }
+.msg-bubble li { margin-bottom: 2px; }
+.msg-bubble code {
+  background: rgba(124,111,247,.15); color: #c5b4ff;
+  padding: 1px 5px; border-radius: 4px; font-size: .87em;
+  font-family: 'JetBrains Mono','Fira Code',monospace;
+}
+.msg-bubble pre {
+  background: #0a0b10; border: 1px solid var(--border2); border-radius: 6px;
+  padding: 10px 12px; margin: 6px 0; overflow-x: auto;
+}
+.msg-bubble pre code {
+  background: none; color: #b4c8f0; padding: 0; font-size: .82em;
+}
+.msg-bubble blockquote {
+  border-left: 3px solid var(--accent); margin: 5px 0;
+  padding: 3px 10px; color: var(--text-dim);
+  background: rgba(124,111,247,.06); border-radius: 0 4px 4px 0;
+}
+.msg-bubble hr { border: none; border-top: 1px solid var(--border2); margin: 7px 0; }
+.msg-bubble table { border-collapse: collapse; margin: 5px 0; width: 100%; font-size: .88em; }
+.msg-bubble th { background: var(--surface3); border: 1px solid var(--border2); padding: 4px 8px; text-align: left; }
+.msg-bubble td { border: 1px solid var(--border2); padding: 3px 8px; }
+.msg-bubble a { color: var(--accent-h); text-decoration: underline; }
+/* user 气泡（紫底白字）覆盖 */
+.msg.user .msg-bubble code { background: rgba(255,255,255,.18); color: #fff; }
+.msg.user .msg-bubble pre  { background: rgba(0,0,0,.25); border-color: rgba(255,255,255,.2); }
+.msg.user .msg-bubble pre code { color: #e8e4ff; }
+.msg.user .msg-bubble blockquote { border-left-color: rgba(255,255,255,.5); color: rgba(255,255,255,.8); background: rgba(0,0,0,.15); }
+.msg.user .msg-bubble th { background: rgba(0,0,0,.2); border-color: rgba(255,255,255,.18); }
+.msg.user .msg-bubble td { border-color: rgba(255,255,255,.18); }
+.msg.user .msg-bubble a  { color: #e0d8ff; }
+</style>
+<script src="/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.46.0/min/vs/loader.js"></script>
+<script>
+// 配置 marked：GFM + 换行符转 <br>
+window.addEventListener('DOMContentLoaded', () => {
+  if (typeof marked !== 'undefined') {
+    marked.use({ gfm: true, breaks: true });
+  }
+});
+</script>
+</head>
+<body>
+
+<!-- Topbar -->
+<div class="topbar">
+  <div class="brand">World One</div>
+  <div class="topbar-spacer"></div>
+  <span class="mode-badge" id="mode-badge" data-i18n="mode.chat">Chat</span>
+  <span class="canvas-session-label" id="canvas-session-label"></span>
+  <button class="topbar-btn exit-canvas" onclick="exitToMainSession()">
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+    <span data-i18n="topbar.exitCanvas">退出图模式</span>
+  </button>
+</div>
+
+<!-- sys.confirm / sys.alert / sys.prompt — AIPP System Widget Modal -->
+<div class="sys-modal-overlay" id="sys-modal-overlay">
+  <div class="sys-modal" id="sys-modal">
+    <div class="sys-modal-title" id="sys-modal-title"></div>
+    <div class="sys-modal-message" id="sys-modal-message"></div>
+    <!-- sys.prompt input -->
+    <input class="sys-modal-input" id="sys-modal-input" type="text" style="display:none" />
+    <!-- buttons -->
+    <div class="sys-modal-buttons" id="sys-modal-buttons"></div>
+  </div>
+</div>
+
+<!-- Settings overlay -->
+<div class="settings-overlay" id="settings-overlay" onclick="overlayClick(event)">
+  <div class="settings-panel">
+    <div class="settings-header">
+      <span class="settings-title" data-i18n="settings.title">⚙ World One 设置</span>
+      <button class="btn-close-settings" onclick="closeSettings()">×</button>
+    </div>
+    <form onsubmit="event.preventDefault(); saveSettings();">
+    <div class="settings-body">
+      <div>
+        <div class="settings-section" data-i18n="settings.llmSection">LLM 连接</div>
+        <div class="form-group">
+          <label class="form-label" data-i18n="settings.provider">Provider 预设</label>
+          <select class="form-select" id="s-provider" onchange="applyPreset()">
+            <option value="deepseek">DeepSeek（推荐）</option>
+            <option value="openai">OpenAI</option>
+            <option value="custom">Custom / Local Ollama</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label"><span data-i18n="settings.apiKey">API Key</span> <span style="color:var(--danger)">*</span></label>
+          <input class="form-input" type="password" id="s-apikey" autocomplete="off">
+          <span class="form-hint" data-i18n="settings.apiKeyHint">持久化到本地，不上传服务器</span>
+        </div>
+        <div class="form-group">
+          <label class="form-label" data-i18n="settings.baseUrl">Base URL</label>
+          <input class="form-input" type="text" id="s-baseurl" placeholder="https://api.deepseek.com/v1">
+        </div>
+        <div class="form-group">
+          <label class="form-label" data-i18n="settings.model">Model</label>
+          <input class="form-input" type="text" id="s-model" placeholder="deepseek-chat">
+        </div>
+        <div class="form-group" style="margin-bottom:4px">
+          <label class="form-label" data-i18n="settings.timeout">Timeout（秒）</label>
+          <input class="form-input" type="number" id="s-timeout" placeholder="120" min="10" max="600">
+        </div>
+        <div class="test-result" id="test-result"></div>
+      </div>
+      <div>
+        <div class="settings-section" data-i18n="settings.statusSection">连接状态</div>
+        <div style="font-size:12px;color:var(--text-dim);display:flex;align-items:center">
+          <span class="status-dot" id="status-dot"></span>
+          <span id="status-text" data-i18n="settings.notConfigured">API Key 未配置</span>
+        </div>
+      </div>
+      <div>
+        <div class="settings-section" data-i18n="settings.envSection">Host 环境变量</div>
+        <span class="form-hint" data-i18n="settings.envHint">
+          变量会自动注入到所有 AIPP 调用。若设置 app 覆盖值，将优先于全局值。
+        </span>
+        <div class="envvar-list" id="s-envvars-list"></div>
+        <div class="envvar-footer">
+          <span class="envvar-empty" id="s-envvars-empty" data-i18n="settings.envEmpty">尚未配置环境变量</span>
+          <button type="button" class="btn-inline" onclick="addEnvVarRow()" data-i18n="settings.addEnvVar">+ 添加变量</button>
+        </div>
+      </div>
+    </div>
+    <div class="settings-footer">
+      <button type="button" class="btn-secondary" id="btn-test" onclick="testConnection()" data-i18n="settings.testBtn">测试连接</button>
+      <button type="submit" class="btn-primary" data-i18n="settings.saveBtn">保存</button>
+    </div>
+    </form>
+  </div>
+</div>
+
+<!-- APPS PANEL (slides out from funcbar) -->
+<div class="apps-panel" id="apps-panel">
+  <div class="apps-header">
+    <span class="apps-title" data-i18n="apps.title">应用</span>
+  </div>
+  <div class="apps-body" id="apps-body">
+    <iframe id="apps-iframe"
+            sandbox="allow-scripts allow-same-origin"
+            style="width:100%;height:100%;border:none;display:block;"></iframe>
+  </div>
+</div>
+
+<!-- Workspace -->
+<div class="workspace">
+
+  <!-- FUNCTION BAR (always visible 48px) -->
+  <div class="funcbar" id="funcbar">
+    <div class="funcbar-top">
+      <!-- All -->
+      <button class="fb-btn active" id="fb-all" onclick="onFuncbarClick('all')" data-i18n-title="panel.all">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+      </button>
+      <!-- Conversations -->
+      <button class="fb-btn" id="fb-conversation" onclick="onFuncbarClick('conversation')" data-i18n-title="panel.conversations">
+        <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      </button>
+      <!-- Tasks -->
+      <button class="fb-btn" id="fb-task" onclick="onFuncbarClick('task')" data-i18n-title="panel.tasks">
+        <svg viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      </button>
+      <!-- Events -->
+      <button class="fb-btn" id="fb-event" onclick="onFuncbarClick('event')" data-i18n-title="panel.events">
+        <svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      </button>
+    </div>
+    <div class="funcbar-bottom">
+      <div class="funcbar-sep"></div>
+      <!-- Apps launcher -->
+      <button class="fb-btn" id="fb-apps" onclick="toggleAppsPanel()" data-i18n-title="apps.title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="6" height="6" rx="1"/><rect x="15" y="3" width="6" height="6" rx="1"/>
+          <rect x="3" y="15" width="6" height="6" rx="1"/><rect x="15" y="15" width="6" height="6" rx="1"/>
+        </svg>
+      </button>
+      <!-- Settings -->
+      <button class="fb-btn" id="fb-settings" onclick="openSettings()" data-i18n-title="settings.title">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
+      <!-- User -->
+      <div class="fb-btn" style="cursor:default" title="User">
+        <div class="user-badge">W</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TASK PANEL (collapsible) -->
+  <div class="task-panel" id="task-panel">
+    <div class="panel-header">
+      <span class="panel-title" id="panel-title" data-i18n="panel.all">全部</span>
+      <button class="panel-icon-btn" onclick="startNewChat()" id="btn-new-session" title="新建对话">
+        <svg viewBox="0 0 16 16"><path d="M13 2l1 1-9 9H3v-2L13 2z"/><path d="M11 4l1 1"/></svg>
+      </button>
+      <button class="panel-icon-btn" onclick="collapsePanel()" title="收起面板">
+        <svg viewBox="0 0 16 16"><polyline points="10 4 6 8 10 12"/></svg>
+      </button>
+    </div>
+    <div class="session-list" id="session-list"></div>
+    <div class="panel-footer" id="panel-footer" style="display:none">
+      <button class="btn-show-all" id="btn-show-all" onclick="toggleShowAll()"></button>
+    </div>
+  </div>
+
+  <!-- CHAT MODE main -->
+  <div class="chat-main" id="chat-main">
+    <div class="messages" id="full-messages">
+      <div class="welcome-hint" id="welcome-hint"></div>
+    </div>
+    <div class="readonly-notice" id="full-readonly-notice" style="display:none">📖 只读模式 — 此会话已结束，无法继续发送消息</div>
+    <div class="footer" id="full-footer">
+      <div class="input-row">
+        <!-- Upload button: shown only when active widget manifest declares upload capability -->
+        <button class="btn-action" id="btn-upload" style="display:none" title="上传文件" onclick="triggerWidgetUpload()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        </button>
+        <input type="file" id="upload-file-input" style="display:none" onchange="handleUploadFileSelected(event)">
+        <textarea class="chat-input" id="full-input" rows="1"
+          onkeydown="handleKey(event,'full')"></textarea>
+        <button class="btn-action send" id="full-send" onclick="sendMessage('full')">
+          <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+        <button class="btn-action stop" id="full-stop" style="display:none" onclick="stopStreaming()">
+          <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CANVAS MODE areas -->
+  <!-- CANVAS MODE areas — DOM ownership now lies with AIPP widgets (Plan D).
+       Host's #aipp-canvas-mount is appended into .canvas-area at runtime by
+       _ensureAippCanvasMount() and the active widget injects its UI there. -->
+  <div class="canvas-area" id="canvas-area"></div>
+
+  <!-- RIGHT BAR (chat mode only, 48px — placeholder for future tools) -->
+  <div class="right-bar" id="right-bar"></div>
+
+  <!-- RIGHT CHAT PANEL (canvas mode only) -->
+  <div class="chat-side" id="chat-side">
+    <div class="side-header">
+      <div class="side-title" id="side-title" ondblclick="beginRenameWorldTitle(event)" title="双击重命名当前 canvas session">World One</div>
+      <div class="side-sub" id="side-sub" data-i18n="canvas.sub">Canvas mode</div>
+    </div>
+    <div class="messages" id="panel-messages"></div>
+    <div class="readonly-notice" id="panel-readonly-notice" style="display:none">📖 只读模式 — 此会话已结束，无法继续发送消息</div>
+    <div class="footer" id="panel-footer-wrap">
+      <div class="input-row">
+        <textarea class="chat-input" id="panel-input" rows="1"
+          onkeydown="handleKey(event,'panel')"></textarea>
+        <button class="btn-action send" id="panel-send" onclick="sendMessage('panel')">
+          <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+        <button class="btn-action stop" id="panel-stop" style="display:none" onclick="stopStreaming()">
+          <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /workspace -->
+
+<script>
+// ─── i18n ────────────────────────────────────────────────────────────────────
+const TRANSLATIONS = {
+  zh: {
+    'mode.chat':              'Chat',
+    'mode.canvas':            'Canvas',
+    'topbar.exitCanvas':      '退出 Canvas',
+    'panel.all':              '全部',
+    'panel.conversations':    '对话',
+    'panel.tasks':            '任务',
+    'panel.events':           '事件',
+    'panel.newChat':          '+ 新建',
+    'panel.viewHistory':      '📂 查看历史',
+    'panel.hideHistory':      '📂 隐藏历史',
+    'panel.history':          '历史',
+    'canvas.sub':             'Canvas 模式',
+    'session.type.conversation': '对话',
+    'session.type.task':      '任务',
+    'session.type.event':     '事件',
+    'session.complete':       '完成',
+    'session.void':           '作废',
+    'session.delete':         '删除',
+    'session.status.completed':'完成',
+    'session.status.voided':  '作废',
+    'session.status.active':  '进行中',
+    'task.completed':         '任务完成',
+    'welcome.title':          'World One',
+    'welcome.sub':            '您的个人 AI 助手。',
+    'welcome.chip1':          '你好',
+    'welcome.chip1.send':     '你好',
+    'chat.placeholder':       '请输入消息…',
+    'panel.placeholder':      '继续设计…',
+    'settings.title':         '⚙ World One 设置',
+    'apps.title':             '应用',
+    'settings.llmSection':    'LLM 连接',
+    'settings.provider':      'Provider 预设',
+    'settings.apiKey':        'API Key',
+    'settings.apiKeyHint':    '持久化到 ~/.worldone-config.json，不上传服务器',
+    'settings.baseUrl':       'Base URL',
+    'settings.model':         'Model',
+    'settings.timeout':       'Timeout（秒）',
+    'settings.statusSection': '连接状态',
+    'settings.envSection':    'Host 环境变量',
+    'settings.envHint':       '变量会自动注入到所有 AIPP 调用。若配置 app 覆盖值，将优先于全局值。',
+    'settings.envEmpty':      '尚未配置环境变量',
+    'settings.addEnvVar':     '+ 添加变量',
+    'settings.addAppOverride':'+ App 覆盖',
+    'settings.envKeyPlaceholder':'变量名（如 RUNTIME_ENV）',
+    'settings.envGlobalPlaceholder':'全局值',
+    'settings.envAppValuePlaceholder':'当前 app 的覆盖值',
+    'settings.removeEnvVar':  '删除变量',
+    'settings.removeOverride':'删除覆盖',
+    'settings.testBtn':       '测试连接',
+    'settings.testingBtn':    '测试中…',
+    'settings.saveBtn':       '保存',
+    'settings.configured':    'LLM 已配置',
+    'settings.notConfigured': 'API Key 未配置',
+    'confirm.ok':             '确定',
+    'confirm.cancel':         '取消',
+    'confirm.complete':       '标记任务完成？',
+    'confirm.complete.detail':'完成后归档，不再显示在任务面板。',
+    'confirm.delete':         '永久删除此对话？',
+    'confirm.delete.detail':  '此操作不可恢复。',
+    'event.rename':           '重命名',
+    'event.abort':            '放弃',
+    'event.missingParams':    '缺参',
+    'event.widgetDefaultTitle': '补充参数后继续执行',
+    'confirm.eventAbort.title': '放弃事件',
+    'confirm.eventAbort.message': '放弃处理「{name}」？该事件将从待办列表移除，且不会继续执行。',
+    'confirm.decisionDelete.title': '删除决策',
+    'confirm.decisionDelete.message': '删除决策「{name}」？此操作不可撤销。',
+    'de.delete':              '删除',
+    'de.delete.refs':         '以下决策将其作为上游：',
+    'de.delete.refsHint':     '删除后这些链路的触发引用会悬空。',
+    'error.noApiKey':         '⚠️ API Key 无效或未配置。',
+    'error.connect':          '连接错误：',
+    'ae.listTitle':           'Action 注册表',
+    'act.usedBy':             '被引用',
+    'act.orphan':             '孤儿',
+    'act.orphan.hint':        '宿主 entity 已不存在，打开详情页重新选一个 entity',
+    'act.delete':             '删除 action',
+    'act.delete.confirm':     '确定删除此 action？',
+    'confirm.actionDelete.title': '删除 Action',
+    'confirm.actionDelete.message': '删除 Action「{name}」？此操作不可撤销。',
+    'act.delete.refs':        '该 action 被以下 decisions 引用：',
+    'act.delete.refsHint':    '删除后这些 decision 的引用会变成悬空引用（missing action）。',
+    'ae.addBtn':              '+ 注册',
+    'ae.title.config':        '配置 Action',
+    'ae.title.new':           '注册新 Action',
+    'ae.entityType':          'Entity 类型',
+    'ae.selectEntity':        '选择 Entity...',
+    'ae.globalEntity':        'global（无实体）',
+    'ae.actionName':          'Action 名称',
+    'ae.scope':               '作用范围',
+    'ae.scopeEntity':         'Entity',
+    'ae.scopeCollection':     'Collection',
+    'ae.description':         '描述',
+    'ae.descriptionHint':     'Action 用途说明',
+    'ae.fnBody':              '函数体',
+    'ae.paramHint':           '{param}（{type}）可访问所有字段；集合变量全局可用',
+    'ae.paramHintGlobal':     '集合变量全局可用（如 employees、salaryRecords）',
+    'ae.cancel':              '取消',
+    'ae.save':                '保存',
+    'ae.saving':              '保存中…',
+    'ae.emptyList':           '暂无 Action，点击「+ 注册」添加',
+    'ae.error.required':      'Entity Type 和 Action Name 不能为空',
+    'ae.error.noCode':        'Outline 代码不能为空',
+    'ae.error.saveFailed':    '保存失败：',
+    'de.title':               '决策模板',
+    'de.id':                  'ID',
+    'de.idPlaceholder':       '例如 wire_fault_detected',
+    'de.newTask':             '新任务',
+    'de.goal':                '目标',
+    'de.goalPlaceholder':     '这个决策要做什么',
+    'de.context':             '场景',
+    'de.contextPlaceholder':  '适用的业务场景（可多行）',
+    'de.target':              '目标',
+    'de.tip.triggers':        '判定决策是否需要执行的表达式；返回 true 时触发该决策。',
+    'de.tip.actions':         '本决策可能调用的行为；LLM 会根据业务规则在运行时选择并填参。',
+    'de.tip.hints':           '给 LLM 的查询提示：决策执行时可用的 Outline 表达式与说明，帮助 LLM 理解世界当前状态。',
+    'de.tip.rules':           '绕过 LLM 的确定性规则：按优先级匹配过滤表达式后直接调用绑定的 action，LLM 只处理剩余不确定情况。多数决策无需配置。',
+    'de.tip.newTask':         '勾选后命中此决策时在 Task Panel 创建新任务独立会话执行；不勾选则在主会话内执行。',
+    'de.advanced':            '高级',
+    'de.activator':           '激活器',
+    'de.cron':                'Cron',
+    'de.cronPlaceholder':     '0 9 * * 1-5',
+    'de.upstream':            '上游决策',
+    'de.addUpstream':         '+ 添加',
+    'de.searchDecision':      '搜索决策…',
+    'de.noDecisions':         '无可选决策',
+    'de.noUpstream':          '未选择',
+    'de.triggers':            '触发',
+    'de.actionDefs':          '行为',
+    'de.rules':               '规则',
+    'de.hints':               '提示',
+    'de.add':                 '+',
+    'de.saving':              '保存中…',
+    'de.saved':               '已保存',
+    'de.saveError':           '保存失败',
+    'de.idRequired':          '请填写 ID',
+    'de.triggerDesc':         '描述',
+    'de.actionSemantics':     '业务语义',
+    'de.actionHasSideEffect': '副作用',
+    'de.actionRequiresApproval': '需审批',
+    'de.ruleId':              '规则 ID',
+    'de.priority':            '优先级',
+    'de.filter':              '过滤',
+    'de.bindAction':          '绑定行为',
+    'de.argument':            '参数',
+    'de.rationale':           '理由',
+    'de.hintExpr':            '表达式',
+  },
+  en: {
+    'mode.chat':              'Chat',
+    'mode.canvas':            'Canvas',
+    'topbar.exitCanvas':      'Exit Canvas',
+    'panel.all':              'All',
+    'panel.conversations':    'Chats',
+    'panel.tasks':            'Tasks',
+    'panel.events':           'Events',
+    'panel.newChat':          '+ New',
+    'panel.viewHistory':      '📂 Show History',
+    'panel.hideHistory':      '📂 Hide History',
+    'panel.history':          'History',
+    'canvas.sub':             'Canvas mode',
+    'session.type.conversation': 'Chat',
+    'session.type.task':      'Task',
+    'session.type.event':     'Event',
+    'session.complete':       'Complete',
+    'session.void':           'Void',
+    'session.delete':         'Delete',
+    'session.status.completed':'Done',
+    'session.status.voided':  'Voided',
+    'session.status.active':  'Active',
+    'task.completed':         'Task Completed',
+    'welcome.title':          'World One',
+    'welcome.sub':            'Your personal AI assistant.',
+    'welcome.chip1':          'Hello',
+    'welcome.chip1.send':     'Hello',
+    'chat.placeholder':       'Type a message…',
+    'panel.placeholder':      'Continue designing…',
+    'settings.title':         '⚙ World One Settings',
+    'apps.title':             'Apps',
+    'settings.llmSection':    'LLM Connection',
+    'settings.provider':      'Provider Preset',
+    'settings.apiKey':        'API Key',
+    'settings.apiKeyHint':    'Saved to ~/.worldone-config.json, never uploaded',
+    'settings.baseUrl':       'Base URL',
+    'settings.model':         'Model',
+    'settings.timeout':       'Timeout (seconds)',
+    'settings.statusSection': 'Connection Status',
+    'settings.envSection':    'Host Environment Variables',
+    'settings.envHint':       'Variables are auto-injected into all AIPP calls. App-specific value overrides global value.',
+    'settings.envEmpty':      'No environment variables configured',
+    'settings.addEnvVar':     '+ Add Variable',
+    'settings.addAppOverride':'+ App Override',
+    'settings.envKeyPlaceholder':'Variable key (e.g. RUNTIME_ENV)',
+    'settings.envGlobalPlaceholder':'Global value',
+    'settings.envAppValuePlaceholder':'Override value for this app',
+    'settings.removeEnvVar':  'Remove variable',
+    'settings.removeOverride':'Remove override',
+    'settings.testBtn':       'Test Connection',
+    'settings.testingBtn':    'Testing…',
+    'settings.saveBtn':       'Save',
+    'settings.configured':    'LLM configured',
+    'settings.notConfigured': 'API Key not configured',
+    'confirm.ok':             'OK',
+    'confirm.cancel':         'Cancel',
+    'confirm.complete':       'Mark task complete?',
+    'confirm.complete.detail':'It will be archived and hidden from the panel.',
+    'confirm.delete':         'Delete this conversation permanently?',
+    'confirm.delete.detail':  'This cannot be undone.',
+    'event.rename':           'Rename',
+    'event.abort':            'Abort',
+    'event.missingParams':    'Missing',
+    'event.widgetDefaultTitle': 'Provide parameters to continue',
+    'confirm.eventAbort.title': 'Abort event',
+    'confirm.eventAbort.message': 'Abort "{name}"? It will be removed from pending events and will not run.',
+    'confirm.decisionDelete.title': 'Delete decision',
+    'confirm.decisionDelete.message': 'Delete decision "{name}"? This cannot be undone.',
+    'de.delete':              'Delete',
+    'de.delete.refs':         'Downstream decisions:',
+    'de.delete.refsHint':     'Their decision-chain triggers will break.',
+    'error.noApiKey':         '⚠️ Invalid or missing API Key.',
+    'error.connect':          'Connection error: ',
+    'ae.listTitle':           'Action Registry',
+    'act.usedBy':             'Used by',
+    'act.orphan':             'orphan',
+    'act.orphan.hint':        'Host entity no longer exists — open the editor and pick a new one',
+    'act.delete':             'Delete action',
+    'act.delete.confirm':     'Delete this action?',
+    'act.delete.refs':        'This action is referenced by these decisions:',
+    'act.delete.refsHint':    'After deletion, those references will become dangling (missing action).',
+    'ae.addBtn':              '+ Register',
+    'ae.title.config':        'Configure Action',
+    'ae.title.new':           'Register New Action',
+    'ae.entityType':          'Entity Type',
+    'ae.selectEntity':        'Select Entity…',
+    'ae.globalEntity':        'global (no entity)',
+    'ae.actionName':          'Action Name',
+    'ae.scope':               'Scope',
+    'ae.scopeEntity':         'Entity',
+    'ae.scopeCollection':     'Collection',
+    'ae.description':         'Description',
+    'ae.descriptionHint':     'What this action does',
+    'ae.fnBody':              'Function Body',
+    'ae.paramHint':           '{param} ({type}) has access to all fields; collection vars are global',
+    'ae.paramHintGlobal':     'Collection vars are globally available (e.g. employees, salaryRecords)',
+    'ae.cancel':              'Cancel',
+    'ae.save':                'Save',
+    'ae.saving':              'Saving…',
+    'ae.emptyList':           'No actions yet. Click "+ Register" to add one.',
+    'ae.error.required':      'Entity Type and Action Name are required',
+    'ae.error.noCode':        'Outline code cannot be empty',
+    'ae.error.saveFailed':    'Save failed: ',
+    'de.title':               'Decision Template',
+    'de.id':                  'ID',
+    'de.idPlaceholder':       'e.g. wire_fault_detected',
+    'de.newTask':             'New task',
+    'de.goal':                'Goal',
+    'de.goalPlaceholder':     'What this decision does',
+    'de.context':             'Context',
+    'de.contextPlaceholder':  'Applicable business context (multi-line)',
+    'de.target':              'Target',
+    'de.tip.triggers':        'Boolean expressions deciding whether the decision fires; true → triggered.',
+    'de.tip.actions':         'Candidate actions this decision may invoke; the LLM picks and fills parameters at runtime.',
+    'de.tip.hints':           'Query hints for the LLM: Outline expressions + descriptions that help it read the live world state.',
+    'de.tip.rules':           'Deterministic rules bypassing the LLM: match a filter by priority and directly invoke the bound action. Rarely needed.',
+    'de.tip.newTask':         'When checked, this decision spawns an isolated session in the Task Panel; otherwise it runs inside the main session.',
+    'de.advanced':            'Advanced',
+    'de.activator':           'Activator',
+    'de.cron':                'Cron',
+    'de.cronPlaceholder':     '0 9 * * 1-5',
+    'de.upstream':            'Upstream',
+    'de.addUpstream':         '+ Add',
+    'de.searchDecision':      'Search decisions…',
+    'de.noDecisions':         'No decisions available',
+    'de.noUpstream':          'None selected',
+    'de.triggers':            'Triggers',
+    'de.actionDefs':          'Actions',
+    'de.rules':               'Rules',
+    'de.hints':               'Hints',
+    'de.add':                 '+',
+    'de.saving':              'Saving…',
+    'de.saved':               'Saved',
+    'de.saveError':           'Save failed',
+    'de.idRequired':          'ID required',
+    'de.triggerDesc':         'Description',
+    'de.actionSemantics':     'Semantics',
+    'de.actionHasSideEffect': 'Side effect',
+    'de.actionRequiresApproval': 'Approval',
+    'de.ruleId':              'Rule ID',
+    'de.priority':            'Priority',
+    'de.filter':              'Filter',
+    'de.bindAction':          'Action',
+    'de.argument':            'Argument',
+    'de.rationale':           'Rationale',
+    'de.hintExpr':            'Expression',
+  }
+};
+
+const LANG = navigator.language.startsWith('zh') ? 'zh' : 'en';
+function t(key) { return TRANSLATIONS[LANG][key] || key; }
+
+function applyI18n() {
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    el.textContent = t(el.dataset.i18n);
+  });
+  document.querySelectorAll('[data-i18n-title]').forEach(el => {
+    el.title = t(el.dataset.i18nTitle);
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    el.placeholder = t(el.dataset.i18nPlaceholder);
+  });
+  document.querySelectorAll('[data-i18n-tip]').forEach(el => {
+    el.dataset.tip = t(el.dataset.i18nTip);
+  });
+  // placeholders
+  document.getElementById('full-input').placeholder  = t('chat.placeholder');
+  document.getElementById('panel-input').placeholder = t('panel.placeholder');
+  // welcome hint
+  buildWelcomeHint();
+  // stub for legacy html button reference
+  function updateShowAllBtn() {}
+  function toggleShowAll() {}
+}
+
+// ─── Session Data Model ───────────────────────────────────────────────────────
+const sessionData = {
+  'main': {
+    id: 'main', type: 'conversation', name: 'World One',
+    status: null, messages: [],
+    canvasMode: false,
+    showWelcome: true,
+  }
+};
+
+let currentSessionId      = 'main';
+let isCanvasMode          = false;
+let panelOpen             = true;
+let panelOpenBeforeCanvas = true;
+let activeCategory        = 'all';
+let _completedPageInit    = false; // placeholder, actual state is _completedPage above
+let abortController       = null;
+let isStreaming            = false;
+
+// ─── Init: load sessions from backend ────────────────────────────────────────
+async function loadSessions() {
+  try {
+    const data = await fetch('/api/sessions?all=true').then(r => r.json());
+    const allSessions = [...(data.sessions || []), ...(data.app_sessions || [])];
+    allSessions.forEach(s => {
+      // conversation type sessions (main) never auto-enter canvas mode
+      const isConversation = s.type === 'conversation';
+      const isApp          = s.type === 'app';
+      const canvasMode = !isConversation && !isApp && !!s.widgetType;
+
+      if (!sessionData[s.id]) {
+        sessionData[s.id] = {
+          id: s.id, type: s.type, name: s.name, status: s.status,
+          messages: [], canvasMode,
+          widgetType: (isConversation || isApp) ? null : (s.widgetType || null),
+          canvasSessionId: (isConversation || isApp) ? null : (s.canvasSessionId || null),
+          showWelcome: false,
+        };
+      } else {
+        sessionData[s.id].name            = s.name;
+        sessionData[s.id].status          = s.status;
+        sessionData[s.id].type            = s.type;
+        // 仅在本地 canvasMode 未激活时，从服务端同步 canvas 状态（避免覆盖当前激活状态）
+        if (!sessionData[s.id].canvasMode && !isConversation && !isApp) {
+          sessionData[s.id].widgetType      = s.widgetType || null;
+          sessionData[s.id].canvasSessionId = s.canvasSessionId || null;
+          sessionData[s.id].canvasMode      = !!s.widgetType;
+        }
+      }
+    });
+  } catch(e) {}
+  renderSessions();
+}
+
+// ─── FuncBar ─────────────────────────────────────────────────────────────────
+function onFuncbarClick(cat) {
+  if (cat === activeCategory && panelOpen) {
+    collapsePanel();
+  } else {
+    activeCategory = cat;
+    setPanelOpen(true);
+    updatePanelTitle();
+    renderSessions();
+  }
+  updateFuncbarActive();
+}
+
+function collapsePanel() {
+  setPanelOpen(false);
+  // deactivate all category buttons when collapsed
+  updateFuncbarActive();
+}
+
+function setPanelOpen(open) {
+  panelOpen = open;
+  document.getElementById('task-panel').classList.toggle('collapsed', !open);
+}
+
+function updateFuncbarActive() {
+  ['all','conversation','task','event'].forEach(cat => {
+    document.getElementById('fb-' + cat)
+      .classList.toggle('active', panelOpen && cat === activeCategory);
+  });
+}
+
+function updatePanelTitle() {
+  const keyMap = { all:'panel.all', conversation:'panel.conversations', task:'panel.tasks', event:'panel.events' };
+  document.getElementById('panel-title').textContent = t(keyMap[activeCategory] || 'panel.all');
+  // task / event 只能由 AI 生成，手动"新建"无意义，隐藏按钮避免混淆
+  const canNew = activeCategory === 'all' || activeCategory === 'conversation';
+  document.getElementById('btn-new-session').style.display = canNew ? '' : 'none';
+}
+
+// ─── Mode switching ───────────────────────────────────────────────────────────
+let activeWidgetType = null;  // tracks current canvas widget type
+
+// ── AIPP Widget View 协议 ────────────────────────────────────────────────────
+// 每个 widget 当前激活的视图 id：{ [widgetType]: viewId }
+const _aippActiveViews = {};
+
+/**
+ * Widget 前端在用户切换视图时调用此函数上报当前视图。
+ * Host 发消息时自动将 (widgetType, viewId) 发送给后端，
+ * 后端从 AppRegistry 查 widget manifest 的 llm_hint 注入 LLM。
+ *
+ * @param {string} widgetType
+ * @param {string} viewId      如 'RELATION'
+ */
+function aippReportView(widgetType, viewId) {
+  if (!widgetType || !viewId) return;
+  _aippActiveViews[widgetType] = viewId;
+}
+
+/**
+ * 返回当前 canvas 模式下 widget 的活跃视图（用于 sendMessage 上报后端）。
+ * 若不在 canvas 模式或没有活跃 widget，返回 null。
+ */
+function aippCurrentWidgetView() {
+  if (!isCanvasMode || !activeWidgetType) return null;
+  const viewId = _aippActiveViews[activeWidgetType];
+  if (!viewId) return null;
+  return { widget_type: activeWidgetType, view_id: viewId };
+}
+
+function appIdForWidget(widgetType) {
+  return (_widgetManifests[widgetType] && _widgetManifests[widgetType].app_id) || _currentAppId || '';
+}
+
+function appProxyUrlForWidget(widgetType, path) {
+  const appId = appIdForWidget(widgetType);
+  if (!appId) return path;
+  const suffix = String(path || '').startsWith('/') ? path : '/' + path;
+  return `/api/proxy/app/${encodeURIComponent(appId)}${suffix}`;
+}
+
+function updateCanvasSessionLabel() {
+  const el = document.getElementById('canvas-session-label');
+  const sess = sessionData[currentSessionId];
+  const name = sess ? sess.name || currentSessionId : currentSessionId;
+  const type = sess?.type || '';
+  const showCanvasSession = !!canvasSessionId && !!(sess?.widgetType || activeWidgetType);
+  const displayName = showCanvasSession ? `${name} · ${canvasSessionId}` : name;
+  const maxLen = 16;
+  const truncated = displayName.length > maxLen ? displayName.slice(0, maxLen) + '...' : displayName;
+  el.textContent = type ? `${truncated}(${type})` : truncated;
+  el.title = type ? `${displayName}(${type})` : displayName;
+}
+
+function enterCanvasMode(worldName, widgetType, initialData) {
+  console.log('[enterCanvasMode]', worldName, widgetType);
+  panelOpenBeforeCanvas = panelOpen;
+  setPanelOpen(false);
+  isCanvasMode = true;
+  // Canvas widgets must remain interactive even when the source chat session
+  // is archived/voided; readonly is only for plain chat/task history views.
+  setReadOnlyMode(false);
+  activeWidgetType = widgetType || activeWidgetType;
+  document.body.classList.add('canvas-mode');
+
+  // Plan D: 若 widget manifest 声明了 render.url，走通用 ESM 挂载，
+  // 跳过所有 host-内 legacy 面板分支。
+  const _planDManifest = _widgetManifests[activeWidgetType];
+  const _planDUrl = _planDManifest && _planDManifest.render && _planDManifest.render.url;
+  if (_planDUrl) {
+    document.body.classList.remove('memory-mode');
+    document.body.classList.add('aipp-canvas-mode');
+    const mountEl = _ensureAippCanvasMount();
+    mountAippWidget(mountEl, activeWidgetType, Object.assign({ worldName, canvasSessionId }, initialData || {}));
+  } else {
+    document.body.classList.remove('aipp-canvas-mode');
+    document.body.classList.remove('memory-mode');
+  }
+  document.getElementById('mode-badge').textContent = t('mode.canvas');
+  if (worldName) {
+    const title = canvasSessionId ? `${worldName} · ${canvasSessionId}` : worldName;
+    document.getElementById('side-title').textContent = title;
+  }
+  updateCanvasSessionLabel();
+  syncFullToPanel();
+  // Apply upload config for the active widget
+  applyWidgetUploadConfig(_widgetManifests[activeWidgetType] || null);
+}
+
+function exitCanvasMode() {
+  isCanvasMode = false;
+  activeWidgetType = null;
+  document.body.classList.remove('canvas-mode');
+  document.body.classList.remove('memory-mode');
+  document.body.classList.remove('aipp-canvas-mode');
+  _unmountAippCanvasMount();
+  document.getElementById('mode-badge').textContent = t('mode.chat');
+  updateCanvasSessionLabel();
+  if (sessionData[currentSessionId]) sessionData[currentSessionId].canvasMode = false;
+  // Widget internals (selection/detail panels, etc.) are cleared by widget unmount.
+  try { window.hideNodeDetail?.(); } catch {}
+  setPanelOpen(panelOpenBeforeCanvas);
+  updateFuncbarActive();
+  applyWidgetUploadConfig(null);
+}
+
+/** 退出 canvas 按钮：退出 canvas 模式并返回 World One 主 session。 */
+function exitToMainSession() {
+  if (isCanvasMode) exitCanvasMode();
+  if (currentSessionId !== 'main') {
+    switchSession('main');
+  }
+}
+
+
+
+function lcFirst(s) { return s ? s.charAt(0).toLowerCase() + s.slice(1) : s; }
+
+// ─── Widget Upload (driven by manifest's upload config) ───────────────────────
+let _widgetUploadConfig = null; // populated when a widget with upload capability is active
+
+/**
+ * Called when the active widget manifest is loaded / switched.
+ * Shows or hides the upload button based on manifest.upload presence.
+ */
+function applyWidgetUploadConfig(manifest) {
+  _widgetUploadConfig = (manifest && manifest.upload) ? manifest.upload : null;
+  const btn = document.getElementById('btn-upload');
+  const fileInput = document.getElementById('upload-file-input');
+  if (!btn || !fileInput) return;
+
+  if (_widgetUploadConfig) {
+    btn.style.display = '';
+    btn.title = _widgetUploadConfig.button_label || '上传文件';
+    // Set accept filter from manifest
+    const exts = (_widgetUploadConfig.accept || []).join(',');
+    fileInput.accept = exts;
+  } else {
+    btn.style.display = 'none';
+    fileInput.accept = '';
+  }
+}
+
+function triggerWidgetUpload() {
+  const fileInput = document.getElementById('upload-file-input');
+  if (fileInput) { fileInput.value = ''; fileInput.click(); }
+}
+
+function handleUploadFileSelected(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file || !_widgetUploadConfig) return;
+
+  const maxKb = _widgetUploadConfig.max_size_kb || 256;
+  if (file.size > maxKb * 1024) {
+    alert(`文件过大（最大 ${maxKb} KB），请压缩后重试。`);
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    const content = e.target.result;
+    const ext = file.name.includes('.') ? file.name.split('.').pop() : 'txt';
+    const sizeKb = Math.round(file.size / 1024) || 0;
+    const prompt = _widgetUploadConfig.prompt || '';
+
+    // Assemble message per AippWidgetUpload.assembleMessage spec
+    const sizeStr = sizeKb > 0 ? ` （${sizeKb} KB）` : '';
+    const message = `用户上传了文件「${file.name}」${sizeStr}：\n\n\`\`\`${ext}\n${content}\n\`\`\`\n\n${prompt}`;
+
+    // Inject into chat input and send
+    const input = document.getElementById('full-input');
+    if (input) {
+      input.value = message;
+      input.dispatchEvent(new Event('input'));
+      sendMessage('full');
+    }
+  };
+  reader.onerror = () => alert('文件读取失败，请重试。');
+  reader.readAsText(file, 'utf-8');
+}
+
+
+function escHtml(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function syncFullToPanel() {
+  const sess = sessionData[currentSessionId];
+  const dst  = document.getElementById('panel-messages');
+  dst.innerHTML = '';
+  if (!sess || !sess.messages || !sess.messages.length) return;
+  sess.messages.forEach(m => dst.appendChild(buildMsgEl(m.role, null, m.html)));
+  dst.scrollTop = dst.scrollHeight;
+}
+
+// ─── Session switching ────────────────────────────────────────────────────────
+async function switchSession(targetId) {
+  if (currentSessionId === targetId) return;
+
+  // 保存当前 session 的 DOM 状态
+  const cur = sessionData[currentSessionId];
+  if (cur) {
+    cur.canvasMode = isCanvasMode;
+    const activeMsgEl = isCanvasMode
+      ? document.getElementById('panel-messages')
+      : document.getElementById('full-messages');
+    cur.messages = saveDomMessages(activeMsgEl);
+  }
+
+  currentSessionId = targetId;
+  const next = sessionData[targetId];
+  if (!next) return;
+
+  // 1. 若本地无消息记录，从服务端加载对话历史
+  if (!next.messages || next.messages.length === 0) {
+    try {
+      const resp = await fetch(`/api/sessions/${targetId}/messages`);
+      if (resp.ok) {
+        const { messages } = await resp.json();
+        next.messages = (messages || []).map(m => {
+          if (m.role === 'widget') {
+            // widget 消息：保存 widgetJson，restoreMessages 会重建 ESM widget
+            return { role: 'assistant', widgetJson: m.widgetJson, processed: m.processed === true };
+          }
+          return { role: m.role, html: md(m.content) };
+        });
+      }
+    } catch(e) { /* 静默失败，显示空页面 */ }
+  }
+
+  // 2. 判断 canvas 模式切换
+  const needsCanvas = next.canvasMode || !!next.widgetType;
+  if (needsCanvas && !isCanvasMode) {
+    enterCanvasMode(next.name, next.widgetType, { canvasSessionId: next.canvasSessionId || canvasSessionId });
+  } else if (needsCanvas && isCanvasMode && next.widgetType !== activeWidgetType) {
+    // switching between different canvas widget types
+    activeWidgetType = next.widgetType || activeWidgetType;
+    const _swManifest = _widgetManifests[activeWidgetType];
+    const _swPlanDUrl = _swManifest && _swManifest.render && _swManifest.render.url;
+    if (_swPlanDUrl) {
+      document.body.classList.remove('memory-mode');
+      document.body.classList.add('aipp-canvas-mode');
+      mountAippWidget(_ensureAippCanvasMount(), activeWidgetType, { worldName: next.name, canvasSessionId: next.canvasSessionId || canvasSessionId });
+    } else {
+      document.body.classList.remove('memory-mode');
+      document.body.classList.remove('aipp-canvas-mode');
+      _unmountAippCanvasMount();
+    }
+    if (next.name) {
+      const title = (next.canvasSessionId || canvasSessionId)
+        ? `${next.name} · ${next.canvasSessionId || canvasSessionId}`
+        : next.name;
+      document.getElementById('side-title').textContent = title;
+    }
+  } else if (!needsCanvas && isCanvasMode) {
+    exitCanvasMode();
+  }
+  updateCanvasSessionLabel();
+
+  // 3. 先渲染消息
+  restoreMessages(next);
+  // canvas 模式切换后（如 memory→world），panel-messages 也需同步更新
+  if (isCanvasMode) syncFullToPanel();
+  renderSessions();
+
+  // 4. Canvas widgets own their restore/data-refresh behavior. Host only keeps
+  // the canvas session id and remounts the AIPP-provided module.
+  if (needsCanvas) {
+    if (next.canvasSessionId) canvasSessionId = next.canvasSessionId;
+  }
+
+  // App canvas sessions should stay interactive even if their backing session is archived.
+  // Read-only lock remains for normal conversation/task/event sessions.
+  const shouldReadOnly = !needsCanvas && next.type !== 'app' && isArchived(next);
+  setReadOnlyMode(shouldReadOnly);
+}
+
+/** 将纯文本内容转为安全 HTML 显示（保留换行）。 */
+function escapeHtmlContent(text) {
+  if (!text) return '';
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\n/g, '<br>');
+}
+
+function saveDomMessages(container) {
+  const result = [];
+  container.querySelectorAll('.msg').forEach(el => {
+    // widget 消息：从 data 属性恢复 widgetJson 和 processed 状态
+    if (el.dataset.widgetJson) {
+      result.push({
+        role: 'assistant',
+        widgetJson: el.dataset.widgetJson,
+        processed: el.dataset.processed === 'true',
+      });
+      return;
+    }
+    const role   = el.classList.contains('user') ? 'user'
+                 : el.classList.contains('system') ? 'system' : 'assistant';
+    const bubble = el.querySelector('.msg-bubble');
+    result.push({ role, html: bubble ? bubble.innerHTML : '' });
+  });
+  return result;
+}
+
+function restoreMessages(sess) {
+  const fullBox  = document.getElementById('full-messages');
+  const panelBox = document.getElementById('panel-messages');
+  fullBox.innerHTML  = '';
+  panelBox.innerHTML = '';
+
+  if (sess.showWelcome || (!sess.messages.length && sess.id === 'main')) {
+    buildWelcomeHint();
+    return;
+  }
+
+  const messages = _normalizedConversationMessages(sess.messages || []);
+  messages.forEach(m => {
+    let el;
+    if (m.widgetJson) {
+      // 刷新恢复：无论 processed 与否都保留 widget。
+      // processed=true 时用只读模式回显已输入值，按钮禁用。
+      const forceReadonly = m.processed || _isReadonlyWidgetJson(m.widgetJson);
+      const widgetJson = forceReadonly ? _toReadonlyWidgetJson(m.widgetJson) : m.widgetJson;
+      el = document.createElement('div');
+      el.className = 'msg assistant html-widget-msg';
+      renderHtmlWidget(widgetJson, el);
+      if (forceReadonly) el.dataset.processed = 'true';
+      // 注入 widget delete 按钮
+      _injectWidgetActions(el);
+    } else {
+      el = buildMsgEl(m.role, null, m.html);
+    }
+    fullBox.appendChild(el);
+    if (sess.canvasMode) panelBox.appendChild(el.cloneNode(true));
+  });
+  fullBox.scrollTop  = fullBox.scrollHeight;
+  panelBox.scrollTop = panelBox.scrollHeight;
+}
+
+function _toReadonlyWidgetJson(widgetJson, options = {}) {
+  try {
+    const root = typeof widgetJson === 'string' ? JSON.parse(widgetJson) : (widgetJson || {});
+    const data = root.data && typeof root.data === 'object' ? root.data : {};
+    const event = data.event && typeof data.event === 'object' ? data.event : {};
+    const business = event.business_data && typeof event.business_data === 'object' ? event.business_data : {};
+    const resumeArgs = business.resume_args && typeof business.resume_args === 'object' ? business.resume_args : {};
+    const providedParams = options.providedParameters && typeof options.providedParameters === 'object'
+      ? options.providedParameters
+      : null;
+    const mergedBusiness = providedParams
+      ? Object.assign({}, business, {
+          provided_parameters: providedParams,
+          resume_args: Object.assign({}, resumeArgs, { parameters: providedParams })
+        })
+      : business;
+    const state = _normalizeWidgetState(options.widgetState);
+    const readonlyEvent = Object.assign({}, event, { business_data: mergedBusiness });
+    const readonlyData = Object.assign({}, data, {
+      event: readonlyEvent,
+      __readonly: true,
+      __submitted: true,
+      ...(state ? { __widget_state: state } : {})
+    });
+    return JSON.stringify(Object.assign({}, root, { data: readonlyData }));
+  } catch (_) {
+    return widgetJson;
+  }
+}
+
+function _normalizeWidgetState(state) {
+  if (!state || typeof state !== 'object' || Array.isArray(state)) return null;
+  return Object.keys(state).length ? state : null;
+}
+
+function _extractWidgetState(widgetJson) {
+  try {
+    const root = typeof widgetJson === 'string' ? JSON.parse(widgetJson) : (widgetJson || {});
+    return _normalizeWidgetState(root?.data?.__widget_state);
+  } catch (_) {
+    return null;
+  }
+}
+
+function _isReadonlyWidgetJson(widgetJson) {
+  try {
+    const root = typeof widgetJson === 'string' ? JSON.parse(widgetJson) : (widgetJson || {});
+    const data = root?.data && typeof root.data === 'object' ? root.data : {};
+    return data.__readonly === true || data.__submitted === true;
+  } catch (_) {
+    return false;
+  }
+}
+
+// ─── Streaming helpers ────────────────────────────────────────────────────────
+function setStreaming(on) {
+  isStreaming = on;
+  ['full','panel'].forEach(area => {
+    const send = document.getElementById(area + '-send');
+    const stop = document.getElementById(area + '-stop');
+    if (send) send.style.display = on ? 'none' : 'flex';
+    if (stop) stop.style.display = on ? 'flex' : 'none';
+  });
+}
+
+function stopStreaming() {
+  if (abortController) { abortController.abort(); abortController = null; }
+}
+
+function activeMessages() {
+  return document.getElementById(isCanvasMode ? 'panel-messages' : 'full-messages');
+}
+
+// ─── Send & receive ───────────────────────────────────────────────────────────
+async function sendMessage(area) {
+  if (isStreaming) return;
+  const input = document.getElementById(area + '-input');
+  const msg = input.value.trim();
+  if (!msg) return;
+  input.value = '';
+  autoResize(input);
+  hideWelcome();
+
+  addMessage('user', msg);
+  setStreaming(true);
+
+  const triggerMsg = msg;
+  abortController = new AbortController();
+  let liveId          = addLiveProgress();
+  let pendingThinking = null;   // 从 thinking 事件暂存，等第一个 text_token 时一起渲染
+  let streamState     = null;   // { msgEl, textDiv, fullText } — 流式回答状态
+  let liveFinalized   = false;
+
+  try {
+    // ── AIPP Widget View 协议：前端只上报 (widget_type, view_id)，
+    //    后端 AppRegistry 从 widget manifest 查 llm_hint，完全泛化，不依赖 widget 特殊逻辑。
+    const widgetView = aippCurrentWidgetView();
+
+    const resp = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: currentSessionId, message: msg,
+                             ...(widgetView ? { widget_view: widgetView } : {}) }),
+      signal: abortController.signal,
+    });
+
+    const reader  = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+
+      for (const line of lines) {
+        if (!line.startsWith('data:')) continue;
+        const json = line.slice(5).trim();
+        if (!json) continue;
+        try {
+          const ev = JSON.parse(json);
+          console.log('[SSE]', ev.type, ev.content?.slice?.(0, 80));
+
+          if (ev.type === 'annotation') {
+            // AIPP 灰色注解行（在工具 chip 前显示 AIPP 标识）
+            updateLiveProgress(liveId, ev);
+
+          } else if (ev.type === 'tool_call') {
+            // 工具调用代表本轮文本只是中途叙述，不是最终答案：
+            // 把当前流式气泡降级成灰色 thinking 样式，等下一段 text_token 重开新气泡。
+            if (streamState) {
+              streamState.msgEl.classList.add('thinking-roll', 'mid-tool-thinking');
+              streamState.textDiv.classList.remove('streaming');
+              streamState = null;
+              // 同时新建一个 live-progress 气泡承载工具进度
+              liveId = addLiveProgress();
+              liveFinalized = false;
+              pendingThinking = null;
+            }
+            updateLiveProgress(liveId, ev);
+
+          } else if (ev.type === 'canvas') {
+            handleCanvasCommand(JSON.parse(ev.content));
+
+          } else if (ev.type === 'html_widget') {
+            // is_canvas_mode=false widget：渲染为聊天流内嵌 ESM 卡片
+            // 注意：若 text_token 先到，startStreamingResponse 已把 liveId 从 DOM 移除
+            // 并用 streamState.msgEl 替代——此时需接管 msgEl 来渲染 widget
+            let containerEl = document.getElementById(liveId);
+            if (!containerEl && streamState) {
+              // text_token 先于 html_widget 到达：接管流式文本元素
+              containerEl = streamState.msgEl;
+              streamState = null; // 不再走 finalizeStream
+            }
+            if (containerEl) {
+              containerEl.innerHTML = '';
+              containerEl.className = 'msg assistant'; // 清掉流式相关 class
+              renderHtmlWidget(ev.content, containerEl);
+              _lastHtmlWidgetEl = containerEl;
+              _lastHtmlWidgetSessionId = currentSessionId;
+              liveFinalized = true;
+              const sess = sessionData[currentSessionId];
+              if (sess) sess.messages.push({ role: 'assistant', widgetJson: ev.content });
+            }
+
+          } else if (ev.type === 'session') {
+            // session 切换：移除当前进度，在新 session 里重建进度气泡
+            removeLiveProgress(liveId);
+            handleSessionEvent(JSON.parse(ev.content), triggerMsg);
+            liveId = addLiveProgress();
+            streamState = null;
+            pendingThinking = null;
+            liveFinalized = false;
+
+          } else if (ev.type === 'thinking') {
+            pendingThinking = ev.content;
+            updateLiveProgress(liveId, ev);  // 显示思考预览
+
+          } else if (ev.type === 'text_token') {
+            // 第一个 token：进度气泡升级为流式回答气泡
+            if (!streamState) {
+              // 不再把中间 reasoning 文本带到最终答案气泡里
+              const { msgEl, textDiv } = startStreamingResponse(liveId, null);
+              streamState = { msgEl, textDiv, fullText: '' };
+              liveFinalized = true;  // live bubble 已被替换，不需 removeLiveProgress
+              pendingThinking = null;
+            }
+            streamState.fullText += ev.content;
+            appendToken(streamState.textDiv, streamState.fullText);
+
+          } else if (ev.type === 'text') {
+            // 兼容非流式路径（工具调用失败后直接返回 text 的情况）
+            const thinking = pendingThinking;
+            pendingThinking = null;
+            if (!streamState) {
+              finalizeLiveProgress(liveId, ev.content, thinking);
+              liveFinalized = true;
+            }
+
+          } else if (ev.type === 'error') {
+            removeLiveProgress(liveId);
+            handleError(ev.content);
+            liveFinalized = true;
+
+          } else if (ev.type === 'done') {
+            // 最终答案到达：移除所有中途 thinking 灰色气泡
+            document.querySelectorAll('.msg.assistant.mid-tool-thinking').forEach(el => el.remove());
+            if (streamState) {
+              finalizeStream(streamState.msgEl, streamState.textDiv,
+                             streamState.fullText, null);
+              streamState = null;
+            } else if (!liveFinalized) {
+              removeLiveProgress(liveId);
+            }
+          }
+        } catch(e) {}
+      }
+    }
+  } catch(e) {
+    if (e.name !== 'AbortError') {
+      if (streamState) finalizeStream(streamState.msgEl, streamState.textDiv,
+                                      streamState.fullText, pendingThinking);
+      else removeLiveProgress(liveId);
+      addMessage('assistant', t('error.connect') + e.message);
+    }
+  }
+
+  if (!liveFinalized && !streamState) removeLiveProgress(liveId);
+  setStreaming(false);
+  abortController = null;
+}
+
+function quickSend(text) {
+  document.getElementById('full-input').value = text;
+  sendMessage('full');
+}
+
+// 跟踪 IME 合成状态，防止拼音输入回车被误判为发送
+let _imeComposing = false;
+document.addEventListener('compositionstart', () => { _imeComposing = true; });
+document.addEventListener('compositionend',   () => { _imeComposing = false; });
+
+function handleKey(e, area) {
+  if (e.key === 'Enter' && !e.shiftKey && !_imeComposing) {
+    e.preventDefault();
+    sendMessage(area);
+  }
+  setTimeout(() => autoResize(e.target), 0);
+}
+
+// ─── SESSION event ────────────────────────────────────────────────────────────
+function handleSessionEvent(data, triggerMsg) {
+  const { ui_session_id, name, type, welcome_message } = data;
+  if (!ui_session_id || ui_session_id === 'main') {
+    console.warn('[handleSessionEvent] refusing to overwrite main session, got:', ui_session_id);
+    return;
+  }
+  const welcomeHtml = md(welcome_message || `进入 **${name}**`);
+
+  if (sessionData[ui_session_id]) {
+    // Session already exists: update metadata but preserve chat history
+    const existing = sessionData[ui_session_id];
+    existing.name   = name || existing.name;
+    if (type) existing.type = type;
+    existing.status = existing.status === 'active' ? 'active' : existing.status;
+    // Only switch to it (don't re-render as blank)
+    switchSession(ui_session_id);
+    if (type !== 'app') {
+      setPanelOpen(true);
+      if (type === 'task' || type === 'event') {
+        activeCategory = type;
+        updatePanelTitle();
+      }
+    }
+  } else {
+    // New session: create fresh
+    sessionData[ui_session_id] = {
+      id: ui_session_id, type, name, status: 'active',
+      messages: [{ role: 'system', html: welcomeHtml }],
+      canvasMode: false,
+      showWelcome: false,
+    };
+    switchSession(ui_session_id);
+    // app sessions never appear in Task Panel
+    if (type !== 'app') {
+      // 新建任务时，确保面板是展开的，让用户看到新 task 条目
+      setPanelOpen(true);
+      // 切换到任务分类，让新 task 高亮
+      if (type === 'task' || type === 'event') {
+        activeCategory = type;
+        updatePanelTitle();
+      }
+    }
+  }
+  updateFuncbarActive();
+  renderSessions();
+}
+
+// ─── Canvas command ───────────────────────────────────────────────────────────
+let canvasSessionId = null;  // active canvas app session id
+
+function handleCanvasCommand(cmd) {
+  console.log('[CANVAS CMD]', JSON.stringify(cmd));
+  if (!cmd?.action) return;
+  const { action, widget_type, props } = cmd;
+
+  // sys.* — AIPP 系统内置 widget
+  // LLM 触发（来自 canvas 事件）→ inline card 嵌入当前 chat 面板，不影响 canvas 模式
+  // 直接 JS 调用（AIPP widget 内部）→ modal overlay（见 showSysModal）
+  if (widget_type && widget_type.startsWith('sys.')) {
+    if (action === 'open') addSysInlineCard(widget_type, cmd.data || props || {});
+    return;
+  }
+
+  const targetWidgetType = widget_type || activeWidgetType;
+  if (!targetWidgetType) return;
+  const targetManifest = _widgetManifests[targetWidgetType] || {};
+  const targetIsPlanD = !!(targetManifest.render && targetManifest.render.url);
+
+  if (cmd.session_id && cmd.session_id !== canvasSessionId) {
+    canvasSessionId = cmd.session_id;
+  }
+
+  if (targetIsPlanD) {
+    const widgetData = Object.assign({}, props || {}, cmd.data || {}, {
+      canvasSessionId: cmd.session_id || canvasSessionId || undefined,
+      sessionName: cmd.session_name || props?.session_name,
+      canvasCommand: cmd,
+    });
+    if (sessionData[currentSessionId]) {
+      sessionData[currentSessionId].canvasMode = action !== 'close';
+      sessionData[currentSessionId].widgetType = targetWidgetType;
+      if (cmd.session_id) sessionData[currentSessionId].canvasSessionId = cmd.session_id;
+    }
+    if (action === 'close') exitToMainSession();
+    else if (!isCanvasMode || activeWidgetType !== targetWidgetType) {
+      enterCanvasMode(cmd.session_name || props?.session_name || targetWidgetType, targetWidgetType, widgetData);
+    } else if (typeof window.aippHandleCanvasCommand === 'function') {
+      window.aippHandleCanvasCommand(cmd);
+    } else {
+      // Same-widget canvas refresh: most app widgets only implement mount().
+      // Remount with fresh data instead of leaving the canvas stale/blank.
+      mountAippWidget(_ensureAippCanvasMount(), targetWidgetType, widgetData);
+    }
+    return;
+  }
+}
+
+async function memProxyTool(tool, args) {
+  const ctx = { userId: 'default', sessionId: currentSessionId, agentId: 'worldone' };
+  const r = await fetch(`/api/proxy/tools/${tool}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ args, _context: ctx }),
+  });
+  return r.json();
+}
+
+/** handleSseEvent: minimal handler for events coming from openAppDirect(). */
+function handleSseEvent(ev, containerEl) {
+  console.log('[SSE]', ev.type, ev.content?.slice?.(0, 120));
+  if (ev.type === 'canvas')       { handleCanvasCommand(JSON.parse(ev.content)); }
+  else if (ev.type === 'html_widget') {
+    renderHtmlWidget(ev.content, containerEl);
+    const sess = sessionData[currentSessionId];
+    if (sess && sess.messages && containerEl) {
+      // openAppDirect created a placeholder assistant message before the SSE result.
+      // Replace that placeholder in local state so refresh/session switching restores
+      // the widget instead of an empty assistant bubble.
+      const widgetMsg = { role: 'assistant', widgetJson: ev.content, processed: containerEl.dataset.processed === 'true' };
+      if (sess.messages.length > 0) sess.messages[sess.messages.length - 1] = widgetMsg;
+      else sess.messages.push(widgetMsg);
+    }
+  }
+  else if (ev.type === 'session') { handleSessionEvent(JSON.parse(ev.content), ''); }
+  else if (ev.type === 'error')   { containerEl.innerHTML = '<span style="color:var(--danger)">' + ev.content + '</span>'; }
+}
+
+function addMessage(role, text, thinking = null) {
+  const box = activeMessages();
+  const el  = buildMsgEl(role, text, null, thinking);
+  if (role === 'user' && text) el.dataset.rawText = text;  // 保存原始文本供重问/编辑使用
+  box.appendChild(el);
+  box.scrollTop = box.scrollHeight;
+  if (isCanvasMode) {
+    const full = document.getElementById('full-messages');
+    full.appendChild(el.cloneNode(true));
+  }
+  const sess = sessionData[currentSessionId];
+  if (sess) sess.messages.push({ role, html: el.querySelector('.msg-bubble').innerHTML });
+  return el;
+}
+
+function buildThinkingBlock(thinking) {
+  if (!thinking) return '';
+  const chevron = `<svg class="th-chevron" viewBox="0 0 10 10" width="9" height="9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3 2l4 3-4 3"/></svg>`;
+  return `<div class="thinking-block"><button class="thinking-toggle" type="button" onclick="toggleThinking(this)">${chevron}思考过程</button><div class="thinking-body">${md(thinking)}</div></div>`;
+}
+
+function toggleThinking(btn) {
+  btn.classList.toggle('open');
+  btn.nextElementSibling.classList.toggle('visible');
+}
+
+function buildMsgEl(role, text, preHtml, thinking = null) {
+  const div = document.createElement('div');
+  div.className = 'msg ' + role;
+  const av = role === 'user' ? 'U' : role === 'system' ? '✓' : 'W';
+  let inner;
+  if (thinking && role === 'assistant') {
+    inner = buildThinkingBlock(thinking) + (preHtml || md(text || ''));
+  } else {
+    inner = preHtml || md(text || '');
+  }
+
+  // SVG icons
+  const icoTrash  = `<svg viewBox="0 0 14 14" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3.5h10M5.5 3.5V2.5a.5.5 0 01.5-.5h2a.5.5 0 01.5.5v1M5.5 6v4.5M8.5 6v4.5M3 3.5l.7 7.2a.5.5 0 00.5.3h5.6a.5.5 0 00.5-.3L11 3.5"/></svg>`;
+  const icoRetry  = `<svg viewBox="0 0 14 14" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 7a5 5 0 105.5-4.97"/><path d="M5.5 1v3h3"/></svg>`;
+  const icoPencil = `<svg viewBox="0 0 14 14" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 2.5l2 2L4 12H2v-2L9.5 2.5z"/></svg>`;
+  const icoCopy   = `<svg viewBox="0 0 14 14" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="7" height="8" rx="1"/><path d="M9 5V3a1 1 0 00-1-1H3a1 1 0 00-1 1v7a1 1 0 001 1h2"/></svg>`;
+
+  let actions = '';
+  if (role === 'user') {
+    actions = `<div class="msg-actions">
+      <button class="msg-action-btn" title="重问" onclick="msgReask(this)">${icoRetry}</button>
+      <button class="msg-action-btn" title="编辑" onclick="msgEdit(this)">${icoPencil}</button>
+      <button class="msg-action-btn" title="删除" onclick="msgDelete(this)">${icoTrash}</button>
+    </div>`;
+  } else if (role === 'assistant') {
+    actions = `<div class="msg-actions">
+      <button class="msg-action-btn" title="复制" onclick="msgCopy(this)">${icoCopy}</button>
+      <button class="msg-action-btn" title="删除" onclick="msgDelete(this)">${icoTrash}</button>
+    </div>`;
+  }
+
+  div.innerHTML = `<div class="msg-avatar">${av}</div><div class="msg-body"><div class="msg-bubble">${inner}</div>${actions}</div>`;
+  return div;
+}
+
+// ── 工具名 → 简短中文标签（Host 解耦：动态 fetch /api/tool-labels）─────────
+let TOOL_LABELS = {};
+(async function _loadToolLabels() {
+  try {
+    const r = await fetch('/api/tool-labels');
+    if (r.ok) TOOL_LABELS = await r.json();
+  } catch (e) { /* 静默：未注册任何 display_label_zh 时为空字典，回退到工具名 */ }
+})();
+function toolLabel(name) { return TOOL_LABELS[name] || name; }
+
+// ── Message action helpers ────────────────────────────────────────────────
+
+/** 从 action 按钮找到所属 .msg 元素 */
+function _msgEl(btn) { return btn.closest('.msg'); }
+
+/**
+ * 从 sessionData.messages 中移除与 DOM 元素对应的条目，并返回其索引（-1 表示未找到）。
+ * 通过元素在消息容器中的位置（索引）定位。
+ */
+function _removeFromSession(el) {
+  const box = el.parentNode;
+  if (!box) return -1;
+  const idx = Array.from(box.children).indexOf(el);
+  if (idx < 0) return -1;
+  const sess = sessionData[currentSessionId];
+  if (sess && sess.messages) sess.messages.splice(idx, 1);
+  return idx;
+}
+
+/** 删除消息（用户消息同时删除紧随其后的 assistant 消息）。 */
+function msgDelete(btn) {
+  if (isStreaming) return;
+  const el   = _msgEl(btn);
+  const box  = el.parentNode;
+  if (!box) return;
+
+  // 计算起始索引（删 DB 前先算，因为 _removeFromSession 会改变数组）
+  const idx = Array.from(box.children).indexOf(el);
+  let count = 1;
+
+  if (el.classList.contains('user')) {
+    const next = el.nextElementSibling;
+    if (next && next.classList.contains('assistant')) {
+      count = 2;
+      _removeFromSession(next); // 先删后一条（索引先不变）
+      next.remove();
+    }
+  }
+  _removeFromSession(el);
+  el.remove();
+
+  // 同步删除后端 DB
+  if (idx >= 0) {
+    fetch(`/api/sessions/${currentSessionId}/messages/range?from=${idx}&count=${count}`,
+      { method: 'DELETE' }).catch(() => {});
+  }
+}
+
+/** 重问：用原问题重新发送，先删除该问题及其 assistant 回答。 */
+async function msgReask(btn) {
+  if (isStreaming) return;
+  const el  = _msgEl(btn);
+  const raw = el.dataset.rawText || el.querySelector('.msg-bubble')?.innerText?.trim();
+  if (!raw) return;
+  await msgReaskWithText(el, raw);
+}
+
+/** 编辑：将 user 气泡替换为可编辑文本框，Enter 键重问。 */
+function msgEdit(btn) {
+  if (isStreaming) return;
+  const el     = _msgEl(btn);
+  const bubble = el.querySelector('.msg-bubble');
+  const raw    = el.dataset.rawText || bubble?.innerText?.trim() || '';
+
+  const ta = document.createElement('textarea');
+  ta.className = 'msg-edit-area';
+  ta.value     = raw;
+  ta.rows      = Math.min(6, (raw.match(/\n/g) || []).length + 1 || 1);
+
+  // 用 textarea 替换 bubble
+  bubble.replaceWith(ta);
+  ta.focus();
+  ta.setSelectionRange(ta.value.length, ta.value.length);
+
+  // Enter 确认，Escape 取消
+  ta.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      const newText = ta.value.trim();
+      if (!newText) return;
+      ta.replaceWith(bubble);  // 恢复 bubble（下面会移除 el）
+      msgReaskWithText(el, newText);
+    } else if (e.key === 'Escape') {
+      ta.replaceWith(bubble);
+    }
+  });
+}
+
+/** 以指定文本重问，并用新结果覆盖旧 assistant 回答。 */
+async function msgReaskWithText(userEl, newText) {
+  const next = userEl.nextElementSibling;
+  if (next && next.classList.contains('assistant')) {
+    _removeFromSession(next);
+    next.remove();
+  }
+  _removeFromSession(userEl);
+  userEl.remove();
+
+  // 必须 await：确保后端清除最后一个 user-turn（含工具调用多条记录）后，再发新消息
+  // 否则新消息到达时旧 user 消息仍在 LLM history，导致 LLM 用文字代替工具响应
+  const sid = currentSessionId;
+  try { await fetch(`/api/sessions/${sid}/messages/last`, { method: 'DELETE' }); }
+  catch (e) { /* 静默失败 */ }
+
+  const area  = isCanvasMode ? 'panel' : 'full';
+  const input = document.getElementById(area + '-input');
+  if (input) { input.value = newText; sendMessage(area); }
+}
+
+/** 复制 assistant 消息文本到剪贴板。 */
+function msgCopy(btn) {
+  const bubble = _msgEl(btn)?.querySelector('.msg-bubble');
+  if (!bubble) return;
+  const text = bubble.innerText || bubble.textContent || '';
+  navigator.clipboard.writeText(text).then(() => {
+    // 短暂提示已复制
+    btn.style.color = 'var(--success, #4fbf8f)';
+    setTimeout(() => { btn.style.color = ''; }, 1200);
+  });
+}
+
+// ── Live progress helpers ─────────────────────────────────────────────────
+
+/** 在当前活跃消息区创建实时进度气泡，返回其 DOM id。 */
+function addLiveProgress() {
+  const id  = 'lp-' + Date.now();
+  const box = activeMessages();
+  const div = document.createElement('div');
+  div.id        = id;
+  div.className = 'msg assistant live-progress';
+  const chipIcon = `<svg viewBox="0 0 12 12" width="9" height="9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="6" cy="6" r="4"/><path d="M6 4v2l1.5 1"/></svg>`;
+  div.innerHTML = `<div class="msg-avatar">W</div><div class="msg-bubble live-bubble">` +
+    `<div class="lp-status"><span class="lp-spinner"></span><span>处理中…</span></div>` +
+    `<div class="lp-tools"></div>` +
+    `<div class="lp-thinking-preview"></div>` +
+    `</div>`;
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+  // canvas 模式：同步镜像到 full-messages（保存历史用，不需要显示）
+  if (isCanvasMode) {
+    const full = document.getElementById('full-messages');
+    const clone = div.cloneNode(true);
+    clone.id = id + '-full';
+    full.appendChild(clone);
+  }
+  return id;
+}
+
+/** 用工具调用 chip、annotation 或思考内容更新进度气泡。 */
+function updateLiveProgress(id, ev) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const box = activeMessages();
+  if (ev.type === 'annotation') {
+    // AIPP 灰色注解行：在工具列表之前插入一行小标签
+    let info = {};
+    try { info = JSON.parse(ev.content); } catch(e) {}
+    const label = info.label || ev.content;
+    const tools = el.querySelector('.lp-tools');
+    // 已有同 label 的 annotation 就不重复插
+    if (!tools.querySelector(`[data-aipp="${label}"]`)) {
+      const badge = document.createElement('span');
+      badge.className = 'lp-aipp-badge';
+      badge.dataset.aipp = label;
+      badge.innerHTML = `<svg viewBox="0 0 10 10" width="8" height="8" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="5" cy="5" r="4"/><path d="M5 3v2.5M5 7h.01"/></svg> ${label}`;
+      tools.insertBefore(badge, tools.firstChild);
+    }
+    const status = el.querySelector('.lp-status');
+    if (status) status.style.display = 'none';
+  } else if (ev.type === 'tool_call') {
+    const tools = el.querySelector('.lp-tools');
+    const chip  = document.createElement('span');
+    chip.className = 'lp-tool-chip';
+    const gearSvg = `<svg viewBox="0 0 12 12" width="9" height="9" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><circle cx="6" cy="6" r="2"/><path d="M6 1v1.5M6 9.5V11M1 6h1.5M9.5 6H11M2.6 2.6l1.1 1.1M8.3 8.3l1.1 1.1M2.6 9.4l1.1-1.1M8.3 3.7l1.1-1.1"/></svg>`;
+    chip.innerHTML = gearSvg + toolLabel(ev.content);
+    tools.appendChild(chip);
+    // 有工具 chip 后隐藏"处理中…"状态行
+    const status = el.querySelector('.lp-status');
+    if (status) status.style.display = 'none';
+  } else if (ev.type === 'thinking') {
+    const tp = el.querySelector('.lp-thinking-preview');
+    if (tp) { tp.innerHTML = md(ev.content); tp.classList.add('visible'); }
+  }
+  box.scrollTop = box.scrollHeight;
+}
+
+/** 将进度气泡替换为最终干净的回答消息，并持久化到 session。 */
+function finalizeLiveProgress(id, text, thinking) {
+  const el = document.getElementById(id);
+  if (!el) { addMessage('assistant', text, thinking); return; }
+
+  const box    = activeMessages();
+  const newEl  = buildMsgEl('assistant', text, null, thinking);
+  box.replaceChild(newEl, el);
+  box.scrollTop = box.scrollHeight;
+
+  // 同步 full-messages 中的镜像
+  if (isCanvasMode) {
+    const full    = document.getElementById('full-messages');
+    const fullLp  = document.getElementById(id + '-full');
+    if (fullLp) full.replaceChild(newEl.cloneNode(true), fullLp);
+  }
+
+  // 持久化到 session（用 bubble innerHTML）
+  const sess = sessionData[currentSessionId];
+  if (sess) sess.messages.push({ role: 'assistant', html: newEl.querySelector('.msg-bubble').innerHTML });
+}
+
+/** 移除进度气泡（用于 error / done 时没有 text 到来的情况）。 */
+function removeLiveProgress(id) {
+  document.getElementById(id)?.remove();
+  document.getElementById(id + '-full')?.remove();
+}
+
+// ── 流式文本渲染 ──────────────────────────────────────────────────────────────
+
+/**
+ * 将进度气泡升级为流式回答泡：
+ * - 保留 thinking 块（若有）
+ * - 添加空 .stream-text 容器，接收逐 token 追加
+ * 返回 { msgEl, textDiv }
+ */
+function startStreamingResponse(liveId, thinking) {
+  const box   = activeMessages();
+  const livEl = document.getElementById(liveId);
+
+  const msgEl = buildMsgEl('assistant', '', null, null);
+  const bubble = msgEl.querySelector('.msg-bubble');
+
+  // 思考块（若有）先放入
+  if (thinking) bubble.innerHTML = buildThinkingBlock(thinking);
+
+  // 流式文本占位 div
+  const textDiv = document.createElement('div');
+  textDiv.className = 'stream-text streaming';
+  bubble.appendChild(textDiv);
+
+  if (livEl) {
+    if (livEl.parentNode === box) {
+      box.replaceChild(msgEl, livEl);
+    } else {
+      // live bubble was added to a different container (e.g. full-messages before canvas activated)
+      livEl.remove();
+      box.appendChild(msgEl);
+    }
+  } else {
+    box.appendChild(msgEl);
+  }
+  box.scrollTop = box.scrollHeight;
+
+  // canvas 模式：更新 full-messages 中的镜像
+  if (isCanvasMode) {
+    const full   = document.getElementById('full-messages');
+    const fullLp = document.getElementById(liveId + '-full');
+    const clone  = msgEl.cloneNode(true);
+    clone.id     = liveId + '-stream-full';
+    if (fullLp) full.replaceChild(clone, fullLp); else full.appendChild(clone);
+  }
+  return { msgEl, textDiv };
+}
+
+/**
+ * 追加一个 token 到流式文本区（高效，无 XSS 风险）。
+ */
+function appendToken(textDiv, fullText) {
+  textDiv.innerHTML = md(fullText);
+  const box = activeMessages();
+  box.scrollTop = box.scrollHeight;
+}
+
+/**
+ * 流式完成：将原始文本转为 markdown 最终渲染，移除光标动画，持久化。
+ */
+function finalizeStream(msgEl, textDiv, fullText, thinking) {
+  // Keep the same DOM structure as streaming phase; only stop cursor animation
+  // and ensure final markdown is fully rendered. This avoids "shrink/jump" on done.
+  textDiv.classList.remove('streaming');
+  textDiv.innerHTML = md(fullText);
+
+  const bubble = msgEl.querySelector('.msg-bubble');
+
+  // canvas 模式：同步 full-messages
+  if (isCanvasMode) {
+    const full      = document.getElementById('full-messages');
+    const fullClone = document.getElementById(msgEl.id + '-stream-full');
+    if (fullClone) full.replaceChild(msgEl.cloneNode(true), fullClone);
+  }
+  // 持久化到 session
+  const sess = sessionData[currentSessionId];
+  if (sess) sess.messages.push({ role: 'assistant', html: bubble.innerHTML });
+}
+
+function addTyping() { return addLiveProgress(); }
+function removeTyping(id) { /* no-op: replaced by live/streaming progress */ }
+
+function hideWelcome() {
+  const hint = document.getElementById('welcome-hint');
+  if (hint) {
+    hint.innerHTML = '';
+    if (sessionData['main']) sessionData['main'].showWelcome = false;
+  }
+}
+
+function buildWelcomeHint() {
+  const el = document.getElementById('welcome-hint');
+  if (!el) return;
+  el.innerHTML = `
+    <h2>${t('welcome.title')}</h2>
+    <p>${t('welcome.sub')}</p>
+    <div class="hint-chips">
+      <span class="chip" onclick="quickSend(${JSON.stringify(t('welcome.chip1.send'))})">${t('welcome.chip1')}</span>
+      <span class="chip" onclick="quickSend(${JSON.stringify(t('welcome.chip2.send'))})">${t('welcome.chip2')}</span>
+      <span class="chip" onclick="quickSend(${JSON.stringify(t('welcome.chip3.send'))})">${t('welcome.chip3')}</span>
+    </div>`;
+}
+
+function handleError(msg) {
+  const isAuth = msg && (msg.includes('401') || msg.includes('Authentication') || msg.includes('api key'));
+  if (isAuth) {
+    addMessage('assistant', t('error.noApiKey') + ` <a href="#" onclick="openSettings();return false" style="color:var(--accent)"> → </a>`);
+    updateSettingsBtn(false);
+    setTimeout(openSettings, 500);
+  } else {
+    addMessage('assistant', '⚠️ ' + msg);
+  }
+}
+
+// ─── Task actions ─────────────────────────────────────────────────────────────
+async function completeSession(id, e) {
+  e.stopPropagation();
+  if (!await w1Confirm({
+    title: t('confirm.complete'),
+    message: t('confirm.complete.detail'),
+  })) return;
+  await fetch(`/api/sessions/${id}/complete`, { method: 'PATCH' });
+  const sess = sessionData[id];
+  if (sess) sess.status = 'completed';
+  if (currentSessionId === id) {
+    if (isCanvasMode) exitCanvasMode();
+    switchSession('main');
+    addMessageToSession('main', 'system', `**${t('task.completed')}** — ${sess?.name || ''}`);
+  }
+  renderSessions();
+}
+
+async function voidSession(id, e) {
+  e.stopPropagation();
+  await fetch(`/api/sessions/${id}/void`, { method: 'PATCH' });
+  if (sessionData[id]) sessionData[id].status = 'voided';
+  if (currentSessionId === id) {
+    if (isCanvasMode) exitCanvasMode();
+    switchSession('main');
+  }
+  renderSessions();
+}
+
+// ── Read-only mode (for viewing completed/voided sessions) ────────────────────
+function setReadOnlyMode(readonly) {
+  const inputs  = ['full-input', 'panel-input'];
+  const sends   = ['full-send', 'panel-send'];
+  const notices = ['full-readonly-notice', 'panel-readonly-notice'];
+
+  inputs.forEach(id  => { const el = document.getElementById(id);  if (el) el.disabled = readonly; });
+  sends.forEach(id   => { const el = document.getElementById(id);  if (el) el.disabled = readonly; });
+
+  // Toggle global widget-readonly class (disables canvas, memory card actions, etc.)
+  document.body.classList.toggle('session-readonly', readonly);
+
+  // Propagate disabled state to each registered AIPP widget container
+  document.querySelectorAll('[data-aipp-widget-type]').forEach(el => {
+    el.dataset.aippDisabled = String(readonly);
+  });
+
+  // Build dynamic notice content
+  let noticeHtml = '📖 只读模式 — 此会话已结束，无法继续发送消息';
+  if (readonly) {
+    const s = sessionData[currentSessionId];
+    if (s && s.status === 'voided') {
+      noticeHtml += ` <button class="readonly-delete-btn" onclick="hardDeleteSession('${currentSessionId}', event)">🗑 永久删除</button>`;
+    }
+  }
+  notices.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.style.display = readonly ? '' : 'none';
+    el.innerHTML = noticeHtml;
+  });
+
+  const fullFooter  = document.getElementById('full-footer');
+  const panelFooter = document.getElementById('panel-footer-wrap');
+  if (fullFooter)  fullFooter.style.opacity  = readonly ? '.5' : '';
+  if (panelFooter) panelFooter.style.opacity = readonly ? '.5' : '';
+}
+
+async function archiveSession(id, e) {
+  e.stopPropagation();
+  const res = await fetch(`/api/sessions/${id}/archive`, { method: 'PATCH' });
+  if ((await res.json()).ok) {
+    if (sessionData[id]) sessionData[id].status = 'archived';
+    if (currentSessionId === id) {
+      if (isCanvasMode) exitCanvasMode();
+      switchSession('main');
+    }
+    renderSessions();
+  }
+}
+
+async function restoreSession(id, e) {
+  e.stopPropagation();
+  const res = await fetch(`/api/sessions/${id}/restore`, { method: 'PATCH' });
+  if ((await res.json()).ok) {
+    if (sessionData[id]) sessionData[id].status = 'active';
+    renderSessions();
+  }
+}
+
+async function hardDeleteSession(id, e) {
+  e.stopPropagation();
+  if (!await w1Confirm({
+    title: t('confirm.delete'),
+    message: t('confirm.delete.detail'),
+    danger: true,
+    confirmLabel: t('session.delete'),
+  })) return;
+  const res = await fetch(`/api/sessions/${id}`, { method: 'DELETE' });
+  if ((await res.json()).ok) {
+    delete sessionData[id];
+    if (currentSessionId === id) switchSession('main');
+    renderSessions();
+  }
+}
+
+function addMessageToSession(targetId, role, text) {
+  const sess = sessionData[targetId];
+  if (!sess) return;
+  sess.messages.push({ role, html: md(text) });
+  if (targetId === currentSessionId) {
+    const box = activeMessages();
+    const el  = buildMsgEl(role, text);
+    box.appendChild(el);
+    box.scrollTop = box.scrollHeight;
+  }
+}
+
+function addMessageToSessionHtml(targetId, role, html) {
+  const sess = sessionData[targetId];
+  if (!sess) return;
+  sess.messages.push({ role, html: html || '' });
+  if (targetId === currentSessionId) {
+    const box = activeMessages();
+    const el  = buildMsgEl(role, null, html || '');
+    box.appendChild(el);
+    box.scrollTop = box.scrollHeight;
+  }
+}
+
+// ─── Session panel render ──────────────────────────────────────────────────────
+let _completedPage   = 0;
+let _completedSearch = '';
+const COMPLETED_PAGE_SIZE = 10;
+
+const SESSION_ICONS = { conversation: '💬', task: '📋', event: '⚡' };
+
+// ── Pending world events (rendered as event-type entries in session list) ──
+let pendingEvents = [];
+
+async function loadPendingEvents() {
+  try {
+    const r = await fetch('/api/world-events?status=pending');
+    if (!r.ok) { pendingEvents = []; renderSessions(); return; }
+    const body = await r.json();
+    pendingEvents = Array.isArray(body) ? body : (Array.isArray(body?.events) ? body.events : []);
+  } catch (e) {
+    pendingEvents = [];
+  }
+  renderSessions();
+}
+window.reloadPendingEvents = loadPendingEvents;
+
+function eventDisplayName(ev) {
+  const custom = (ev?.display_name || ev?.tags?.display_name || '').trim();
+  if (custom) return custom;
+  return (ev?.tags?.decision || ev?.source?.id || ev?.type || 'event').trim();
+}
+
+function buildPendingEventItem(ev) {
+  const div = document.createElement('div');
+  div.className = 'session-item';
+  const icon = SESSION_ICONS['event'] || '⚡';
+  const title = eventDisplayName(ev);
+  const missing = ev?.business_data?.missing_parameters || [];
+  const sub = missing.length
+    ? (t('event.missingParams') + ': ' + missing.join(', '))
+    : (ev?.type || '');
+  div.innerHTML = `<span class="session-icon">${icon}</span>
+    <span class="session-label session-label-event">
+      <span class="event-primary">${esc(title)}</span>
+      <span class="event-secondary">${esc(sub)}</span>
+    </span>
+    <span class="session-actions">
+      <button type="button" class="sess-act" data-event-edit title="${esc(t('event.rename'))}">✎</button>
+      <button type="button" class="sess-act bad" data-event-abort title="${esc(t('event.abort'))}">⊘</button>
+    </span>`;
+  div.querySelector('[data-event-edit]').onclick = (e) => beginRenameWorldEvent(ev, e);
+  div.querySelector('[data-event-abort]').onclick = (e) => abortWorldEvent(ev, e);
+  div.onclick = (e) => {
+    if (e.target.closest('.session-actions, .sess-act')) return;
+    if (e.target.closest('.session-label-editing')) return;
+    handlePendingEventClick(ev);
+  };
+  return div;
+}
+
+function beginRenameWorldEvent(ev, e) {
+  e?.stopPropagation();
+  e?.preventDefault();
+  if (!ev?.id) return;
+  const row = e?.target?.closest?.('.session-item');
+  const primary = row?.querySelector('.event-primary');
+  if (!primary) return;
+  _inlineEditLabel(primary, eventDisplayName(ev), async (newName) => {
+    await saveWorldEventRename(ev.id, newName);
+    if (ev.tags) ev.tags.display_name = newName;
+    ev.display_name = newName;
+    await loadPendingEvents();
+  });
+}
+
+async function saveWorldEventRename(eventId, displayName) {
+  const res = await fetch(`/api/world-events/${encodeURIComponent(eventId)}/rename`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ display_name: displayName }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || 'rename failed');
+  }
+}
+
+async function abortWorldEvent(ev, e) {
+  e?.stopPropagation();
+  if (!ev?.id) return;
+  const name = eventDisplayName(ev);
+  const ok = await w1Confirm({
+    title: t('confirm.eventAbort.title'),
+    message: t('confirm.eventAbort.message').replace('{name}', name),
+    danger: true,
+    confirmLabel: t('event.abort'),
+  });
+  if (!ok) return;
+  try {
+    const r = await fetch(`/api/world-events/${encodeURIComponent(ev.id)}/abort`, { method: 'PATCH' });
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      appendAssistantMessage('⚠️ ' + (body.error || '放弃事件失败'));
+      return;
+    }
+    await loadPendingEvents();
+  } catch (err) {
+    appendAssistantMessage('⚠️ 放弃事件失败：' + (err?.message || err));
+  }
+}
+
+async function handlePendingEventClick(ev) {
+  if (!ev) return;
+  let targetSession = ev.ui_session_id || '';
+  if (targetSession && !sessionData[targetSession]) {
+    await loadSessions();
+  }
+  if (!targetSession || !sessionData[targetSession]) {
+    console.warn('[handlePendingEventClick] unknown ui_session_id, falling back to main:', ev.ui_session_id);
+    targetSession = 'main';
+  }
+  if (currentSessionId !== targetSession) {
+    await switchSession(targetSession);
+  }
+  const sess = sessionData[currentSessionId];
+  const widget = ev.widget || {};
+  const payload = {
+    widget_type: widget.type || 'sys.parameter-missing',
+    title: (widget.schema && widget.schema.title) || t('event.widgetDefaultTitle'),
+    data: { event: ev }
+  };
+  const json = JSON.stringify(payload);
+  const targetEventId = ev.id || '';
+  if (sess && Array.isArray(sess.messages)) {
+    const last = sess.messages[sess.messages.length - 1];
+    if (_widgetEventId(last?.widgetJson) === targetEventId && targetEventId) {
+      const box = activeMessages();
+      box.scrollTop = box.scrollHeight;
+      return;
+    }
+    let existingIdx = -1;
+    for (let i = sess.messages.length - 1; i >= 0; i--) {
+      if (_widgetEventId(sess.messages[i]?.widgetJson) === targetEventId && targetEventId) {
+        existingIdx = i;
+        break;
+      }
+    }
+    if (existingIdx >= 0) {
+      const [msg] = sess.messages.splice(existingIdx, 1);
+      sess.messages.push(msg);
+      restoreMessages(sess);
+      const box = activeMessages();
+      box.scrollTop = box.scrollHeight;
+      return;
+    }
+  }
+  const elMsg = addMessage('assistant', '');
+  elMsg.innerHTML = '';
+  elMsg.className = 'msg assistant';
+  renderHtmlWidget(json, elMsg);
+  if (sess && sess.messages) {
+    const widgetMsg = { role: 'assistant', widgetJson: json, processed: false };
+    if (sess.messages.length > 0) sess.messages[sess.messages.length - 1] = widgetMsg;
+    else sess.messages.push(widgetMsg);
+  }
+  fetch(`/api/sessions/${currentSessionId}/messages/client`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ role: 'widget', widgetJson: json })
+  }).catch(() => {});
+}
+
+function renderSessions() {
+  const el = document.getElementById('session-list');
+  el.innerHTML = '';
+
+  const all    = Object.values(sessionData);
+  const main   = sessionData['main'];
+  // app sessions (type==='app') never appear in the task panel
+  const others = all.filter(s => s.id !== 'main' && s.type !== 'app');
+
+  let filtered = activeCategory === 'all' ? others : others.filter(s => s.type === activeCategory);
+
+  const active    = filtered.filter(s => !isArchived(s));
+  const voided    = filtered.filter(s => s.status === 'voided' || s.status === 'archived');
+  const completed = filtered.filter(s => s.status === 'completed');
+
+  // Active section
+  if (activeCategory === 'all' || activeCategory === 'conversation') {
+    el.appendChild(buildSessionItem(main));
+    if (active.length > 0) el.appendChild(buildDivider());
+  }
+  active.forEach(s => el.appendChild(buildSessionItem(s)));
+
+  // Pending world events appear as ⚡ event-type items (transient — not in
+  // sessionData; clicking routes to the originating ui session and renders the widget).
+  if (activeCategory === 'all' || activeCategory === 'event') {
+    pendingEvents.forEach(ev => el.appendChild(buildPendingEventItem(ev)));
+  }
+
+  // Spacer pushes history groups to the bottom
+  const spacer = document.createElement('div');
+  spacer.className = 'session-list-spacer';
+  el.appendChild(spacer);
+
+  // History groups pinned to bottom
+  const historyWrap = document.createElement('div');
+  historyWrap.className = 'history-groups';
+  if (voided.length > 0)    historyWrap.appendChild(buildHistoryGroup('voided',    '已作废', voided,    true));
+  if (completed.length > 0) historyWrap.appendChild(buildHistoryGroup('completed', '已完成', completed, false));
+  if (voided.length > 0 || completed.length > 0) el.appendChild(historyWrap);
+
+  // Hide the old "view history" footer — no longer needed
+  const footer = document.getElementById('panel-footer');
+  if (footer) footer.style.display = 'none';
+}
+
+/** Build a collapsible history group (voided or completed). */
+function buildHistoryGroup(groupId, label, sessions, canRestore) {
+  const stored = _historyGroupOpen[groupId] !== false; // open by default
+
+  const wrap = document.createElement('div');
+  wrap.className = 'history-group' + (stored ? ' open' : '');
+  wrap.id = 'hg-' + groupId;
+
+  // Group header
+  const hd = document.createElement('div');
+  hd.className = 'history-group-hd';
+  hd.onclick = (e) => {
+    if (e.target.closest('.hg-clear-btn')) return; // don't toggle when clicking clear
+    wrap.classList.toggle('open');
+    _historyGroupOpen[groupId] = wrap.classList.contains('open');
+  };
+
+  hd.innerHTML = `${label} <span class="hg-count">${sessions.length}</span>
+    <span class="hg-spacer"></span><span class="hg-chevron">▾</span>`;
+  wrap.appendChild(hd);
+
+  const body = document.createElement('div');
+  body.className = 'history-group-body';
+
+  if (groupId === 'completed') {
+    // Search row
+    const searchRow = document.createElement('div');
+    searchRow.className = 'hg-search-row';
+    searchRow.innerHTML = `<input class="hg-search" placeholder="搜索…" value="${esc(_completedSearch)}"
+      id="hg-completed-search" oninput="_completedSearch=this.value; _completedPage=0; renderSessions()">`;
+    body.appendChild(searchRow);
+
+    // Filter + paginate
+    const kw = _completedSearch.toLowerCase();
+    const filtered2 = kw
+      ? sessions.filter(s => (s.name || '').toLowerCase().includes(kw))
+      : sessions;
+    const totalPages = Math.ceil(filtered2.length / COMPLETED_PAGE_SIZE) || 1;
+    _completedPage = Math.min(_completedPage, totalPages - 1);
+    const page = filtered2.slice(_completedPage * COMPLETED_PAGE_SIZE, (_completedPage + 1) * COMPLETED_PAGE_SIZE);
+    page.forEach(s => body.appendChild(buildSessionItem(s, canRestore)));
+
+    // Pager
+    if (totalPages > 1) {
+      const pager = document.createElement('div');
+      pager.className = 'hg-pager';
+      pager.innerHTML = `
+        <button class="hg-pager-btn" onclick="_completedPage=Math.max(0,_completedPage-1);renderSessions()" ${_completedPage === 0 ? 'disabled' : ''}>‹</button>
+        <span>${_completedPage + 1} / ${totalPages}</span>
+        <button class="hg-pager-btn" onclick="_completedPage=Math.min(${totalPages-1},_completedPage+1);renderSessions()" ${_completedPage >= totalPages - 1 ? 'disabled' : ''}>›</button>`;
+      body.appendChild(pager);
+    }
+  } else {
+    sessions.forEach(s => body.appendChild(buildSessionItem(s, canRestore)));
+  }
+
+  wrap.appendChild(body);
+  return wrap;
+}
+
+// Track open/close state of each history group
+const _historyGroupOpen = { voided: false, completed: false };
+
+function isArchived(s) {
+  return s.status === 'completed' || s.status === 'voided' || s.status === 'archived';
+}
+
+function buildSessionItem(s, canRestore) {
+  if (!s) return document.createElement('div');
+  const div = document.createElement('div');
+  const archived = isArchived(s);
+
+  div.className = 'session-item'
+    + (s.id === currentSessionId ? ' active' : '')
+    + (archived ? ' archived-session' + (canRestore ? ' can-restore' : '') : '');
+
+  const icon = SESSION_ICONS[s.type] || '💬';
+
+  let actions = '';
+  if (s.id !== 'main') {
+    if (archived) {
+      // Completed: no buttons (read-only archive)
+      // Voided / archived-legacy: ↩ restore only
+      if (canRestore) {
+        // voided: ↩ restore + 🗑 permanent delete (same style, side by side)
+        actions = `<span class="session-actions">
+          <button class="sess-act ok"  onclick="restoreSession('${s.id}',event)"     title="恢复">↩</button>
+          <button class="sess-act bad" onclick="hardDeleteSession('${s.id}',event)"  title="永久删除">🗑</button>
+        </span>`;
+      }
+    } else if (s.type === 'task' || s.type === 'event') {
+      actions = `<span class="session-actions">
+        <button class="sess-act" onclick="beginRenameSession('${s.id}',event)" title="重命名">✎</button>
+        <button class="sess-act ok"  onclick="completeSession('${s.id}',event)" title="${t('session.complete')}">✓</button>
+        <button class="sess-act bad" onclick="voidSession('${s.id}',event)"     title="${t('session.void')}">⊘</button>
+      </span>`;
+    } else if (s.type === 'conversation') {
+      actions = `<span class="session-actions">
+        <button class="sess-act" onclick="beginRenameSession('${s.id}',event)" title="重命名">✎</button>
+        <button class="sess-act bad" onclick="voidSession('${s.id}',event)" title="${t('session.void')}">⊘</button>
+      </span>`;
+    } else {
+      actions = `<span class="session-actions">
+        <button class="sess-act" onclick="beginRenameSession('${s.id}',event)" title="重命名">✎</button>
+      </span>`;
+    }
+  }
+
+  const canRename = s.id !== 'main' && !archived;
+  div.innerHTML = `<span class="session-icon">${icon}</span>
+    <span class="session-label"${canRename ? ` ondblclick="beginRenameSession('${s.id}',event)"` : ''}>${esc(s.name)}</span>
+    ${actions}`;
+
+  // All sessions are clickable (archived sessions open in read-only mode)
+  div.onclick = async (e) => {
+    if (e.target.closest('.session-actions, .sess-act')) return;
+    if (e.target.closest('.session-label-editing')) return;
+    switchSession(s.id);
+  };
+  return div;
+}
+
+/** Inline rename a session in the task panel. */
+function beginRenameSession(id, ev) {
+  if (ev) { ev.stopPropagation(); ev.preventDefault(); }
+  if (!id || id === 'main') return;
+  const s = sessionData[id];
+  if (!s) return;
+  // Locate the label within the session-item that contains the triggering element.
+  let labelEl = null;
+  if (ev && ev.target) {
+    const row = ev.target.closest('.session-item');
+    if (row) labelEl = row.querySelector('.session-label');
+  }
+  if (!labelEl) {
+    const btn = document.querySelector(`button[onclick*="beginRenameSession('${id}'"]`);
+    const row = btn ? btn.closest('.session-item') : null;
+    if (row) labelEl = row.querySelector('.session-label');
+  }
+  if (!labelEl) return;
+  _inlineEditLabel(labelEl, s.name || '', async (newName) => {
+    await saveSessionRename(id, newName);
+  });
+}
+
+/** Shared inline-edit helper: replace the label with an input; Enter saves, Esc cancels, blur saves. */
+function _inlineEditLabel(labelEl, currentValue, onSave) {
+  if (!labelEl || labelEl._editing) return;
+  labelEl._editing = true;
+  const original = labelEl.textContent;
+  const parent = labelEl.parentNode;
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.value = currentValue || original;
+  input.className = (labelEl.className || '') + ' session-label-editing';
+  input.style.cssText = 'font:inherit;color:inherit;background:var(--surface2);border:1px solid var(--accent);border-radius:4px;padding:1px 6px;outline:none;min-width:80px;width:calc(100% - 24px);box-sizing:border-box;';
+  parent.replaceChild(input, labelEl);
+  input.focus();
+  input.select();
+  let done = false;
+  const restore = (txt) => {
+    if (done) return;
+    done = true;
+    labelEl.textContent = txt;
+    parent.replaceChild(labelEl, input);
+    labelEl._editing = false;
+  };
+  const commit = async () => {
+    if (done) return;
+    const v = input.value.trim();
+    if (!v || v === original) { restore(original); return; }
+    try {
+      await onSave(v);
+      restore(v);
+    } catch {
+      restore(original);
+    }
+  };
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter')      { e.preventDefault(); commit(); }
+    else if (e.key === 'Escape'){ e.preventDefault(); restore(original); }
+    e.stopPropagation();
+  });
+  input.addEventListener('click', e => e.stopPropagation());
+  input.addEventListener('dblclick', e => e.stopPropagation());
+  input.addEventListener('blur', commit);
+}
+
+async function saveSessionRename(id, newName) {
+  const res = await fetch(`/api/sessions/${id}/rename`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: newName }),
+  });
+  if (!res.ok) throw new Error('rename failed');
+  if (sessionData[id]) sessionData[id].name = newName;
+  // 如果这个 UI session 绑定了一个世界，顺手把世界（WorldOneSession）的 name 也同步改掉。
+  // 纯显示名变更，世界后端不会有其它副作用。
+  const worldId = sessionData[id]?.canvasSessionId;
+  if (worldId) {
+    try {
+      await fetch(appProxyUrlForWidget(activeWidgetType, `/api/worlds/${encodeURIComponent(worldId)}/rename`), {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newName }),
+      });
+    } catch {}
+  }
+  renderSessions();
+}
+
+
+/** 计算 canvas 模式的 side-title 完整文本（含 · sessionId 后缀）。 */
+function _canvasSideTitle(name) {
+  if (!name) return '';
+  return (activeWidgetType && canvasSessionId)
+    ? `${name} · ${canvasSessionId}`
+    : name;
+}
+
+/** 双击 canvas 模式的 side-title 重命名当前 canvas session。 */
+function beginRenameWorldTitle(ev) {
+  if (ev) ev.stopPropagation();
+  if (!currentSessionId || currentSessionId === 'main') return;
+  const sideTitle = document.getElementById('side-title');
+  if (!sideTitle) return;
+  const s = sessionData[currentSessionId];
+  const currentName = s?.name || '';
+  _inlineEditLabel(sideTitle, currentName, async (newName) => {
+    await saveSessionRename(currentSessionId, newName);
+    // side-title 还原时会被置成 newName，随后我们改回完整格式（含 sessionId 后缀）。
+    setTimeout(() => {
+      const st = document.getElementById('side-title');
+      if (st) st.textContent = _canvasSideTitle(newName);
+    }, 0);
+  });
+}
+
+function buildDivider() {
+  const div = document.createElement('div');
+  div.className = 'session-divider';
+  return div;
+}
+
+// ─── New chat ─────────────────────────────────────────────────────────────────
+async function startNewChat() {
+  if (isStreaming) stopStreaming();
+  const res  = await fetch('/api/sessions', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'conversation', name: t('session.type.conversation') }),
+  });
+  const { session_id } = await res.json();
+  sessionData[session_id] = {
+    id: session_id, type: 'conversation', name: t('session.type.conversation'),
+    status: 'active', messages: [],
+    canvasMode: false,
+    showWelcome: true,
+  };
+  if (isCanvasMode) exitCanvasMode();
+  switchSession(session_id);
+}
+
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
+function md(text) {
+  if (!text) return '';
+  if (typeof marked !== 'undefined') {
+    return marked.parse(text);
+  }
+  // fallback：仅在 marked 未加载时使用（通常不会发生）
+  return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/`([^`]+)`/g,'<code>$1</code>')
+    .replace(/\n/g,'<br>');
+}
+
+function esc(s) {
+  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+window.addEventListener('resize', () => {
+  if (!isCanvasMode) return;
+  window.aippHandleResize?.();
+});
+
+// ─── Settings ─────────────────────────────────────────────────────────────────
+const PRESETS = {
+  deepseek: { baseUrl:'https://api.deepseek.com/v1', model:'deepseek-chat' },
+  openai:   { baseUrl:'https://api.openai.com/v1',   model:'gpt-4o' },
+  custom:   { baseUrl:'http://localhost:11434/v1',    model:'qwen2.5:14b' },
+};
+let _settingsApps = [];
+
+async function openSettings() {
+  document.getElementById('settings-overlay').classList.add('open');
+  try {
+    const [cfg, appsResp] = await Promise.all([
+      fetch('/api/settings').then(r=>r.json()),
+      fetch('/api/apps').then(r=>r.json()).catch(() => ({ apps: [] }))
+    ]);
+    _settingsApps = (appsResp.apps || []).map(a => ({
+      appId: a.app_id || a.id || '',
+      appName: a.app_name || a.name || a.app_id || a.id || ''
+    })).filter(a => a.appId);
+    document.getElementById('s-apikey').value  = cfg.apiKey  || '';
+    document.getElementById('s-baseurl').value = cfg.baseUrl || '';
+    document.getElementById('s-model').value   = cfg.model   || '';
+    document.getElementById('s-timeout').value = cfg.timeoutSeconds || 120;
+    renderEnvVarRows(cfg.envVars || []);
+    applyRuntimeEnvFromSettings(cfg.envVars || []);
+    detectPreset(cfg.baseUrl);
+    updateStatusDot(cfg.configured);
+  } catch(e) {}
+}
+
+function closeSettings() {
+  document.getElementById('settings-overlay').classList.remove('open');
+  document.getElementById('test-result').style.display = 'none';
+}
+
+function overlayClick(e) {
+  if (e.target === document.getElementById('settings-overlay')) closeSettings();
+}
+
+function appendAssistantMessage(text) {
+  if (text) addMessage('assistant', text);
+}
+
+/**
+ * 在当前 chat panel 里插入 sys.* inline 交互卡片。
+ * 用于 LLM 触发的 sys.confirm/alert/selection——不弹 modal，不切换 session。
+ * canvas 模式下插入侧边面板，chat 模式下插入主消息区。
+ */
+function addSysInlineCard(widgetType, data) {
+  const container = activeMessages();
+  if (!container) return;
+
+  const isDanger = !!data.danger;
+  const cardEl = document.createElement('div');
+  cardEl.className = `msg assistant`;
+
+  // Build inner HTML
+  let btnsHtml = '';
+  if (widgetType === 'sys.confirm') {
+    const mode = data.mode || 'yes_no';
+    const [yesLabel, noLabel] = mode === 'ok_cancel' ? ['确定', '取消'] : ['确认删除', '取消'];
+    const yesJson = JSON.stringify(data.yes || {}).replace(/"/g, '&quot;');
+    const noJson  = JSON.stringify(data.no  || {}).replace(/"/g, '&quot;');
+    btnsHtml = `
+      <button class="sys-inline-btn secondary" onclick="sysInlineAction(this.closest('.sys-inline-card'),false,null,'${noJson}')">${noLabel}</button>
+      <button class="sys-inline-btn ${isDanger ? 'danger' : 'primary'}" onclick="sysInlineAction(this.closest('.sys-inline-card'),true,'${yesJson}',null)">${yesLabel}</button>`;
+  } else if (widgetType === 'sys.alert') {
+    btnsHtml = `<button class="sys-inline-btn primary" onclick="sysInlineAction(this.closest('.sys-inline-card'),true,null,null)">确定</button>`;
+  } else if (widgetType === 'sys.choice' || widgetType === 'sys.selection') {
+    (data.options || []).forEach(opt => {
+      const optJson = JSON.stringify(opt).replace(/"/g, '&quot;');
+      btnsHtml += `<button class="sys-inline-btn ${opt.tool ? 'primary' : 'secondary'}" onclick="sysInlineAction(this.closest('.sys-inline-card'),${!!opt.tool},'${optJson}',null)">${opt.label || ''}</button>`;
+    });
+  }
+
+  cardEl.innerHTML = `
+    <div class="msg-bubble">
+      <div class="sys-inline-card${isDanger ? ' danger' : ''}">
+        ${data.title ? `<div class="sys-inline-title">${data.title}</div>` : ''}
+        ${data.message ? `<div class="sys-inline-message">${data.message}</div>` : ''}
+        <div class="sys-inline-buttons">${btnsHtml}</div>
+      </div>
+    </div>`;
+
+  container.appendChild(cardEl);
+  container.scrollTop = container.scrollHeight;
+}
+
+async function ensureMemoryManagerVisibleAfterTool(toolName) {
+  if (!toolName || !String(toolName).startsWith('memory_')) return;
+  // For deletion/cleanup flows, force-open memory-manager to avoid blank canvas.
+  if (!String(toolName).includes('delete')) return;
+  try {
+    const result = await memProxyTool('memory_view', { scope: 'ALL' });
+    const mount = _ensureAippCanvasMount();
+    await mountAippWidget(mount, 'memory-manager', (result && result.graph) || {});
+  } catch (e) {
+    console.warn('[memory-manager] auto-open after delete failed', e);
+  }
+}
+
+async function sysInlineAction(cardEl, confirmed, yesJsonStr, noJsonStr) {
+  if (!cardEl) return;
+  cardEl.querySelectorAll('button').forEach(b => b.disabled = true);
+
+  try {
+    if (confirmed && yesJsonStr) {
+      const yes = JSON.parse(yesJsonStr.replace(/&quot;/g, '"'));
+      if (yes.tool) {
+        await memProxyTool(yes.tool, yes.args || {});
+        // Notify any mounted AIPP widget that an external tool completed, so it
+        // can refresh its data. Widgets opt in by listening to this event.
+        window.dispatchEvent(new CustomEvent('aipp:tool-completed', { detail: { tool: yes.tool } }));
+        await ensureMemoryManagerVisibleAfterTool(yes.tool);
+      }
+      cardEl.innerHTML = '<div class="sys-inline-done">✓ 操作已完成</div>';
+    } else {
+      const no = noJsonStr ? JSON.parse(noJsonStr.replace(/&quot;/g, '"')) : null;
+      const msg = no && no.message ? no.message : '已取消';
+      cardEl.innerHTML = `<div class="sys-inline-done">${msg}</div>`;
+    }
+  } catch(e) {
+    cardEl.innerHTML = '<div class="sys-inline-done" style="color:var(--danger)">操作失败</div>';
+  }
+}
+
+// ── AIPP System Widget: sys.confirm / sys.alert / sys.prompt ────────────────
+
+let _sysModalResolve = null;
+
+/**
+ * Host 标准确认框（复用 sys-modal，替代浏览器 confirm）。
+ * @returns {Promise<boolean>}
+ */
+async function w1Confirm(opts = {}) {
+  const r = await showSysModal('sys.confirm', {
+    title: opts.title || '',
+    message: opts.message || '',
+    mode: 'ok_cancel',
+    danger: !!opts.danger,
+    confirmLabel: opts.confirmLabel || t('confirm.ok'),
+    cancelLabel: opts.cancelLabel || t('confirm.cancel'),
+  });
+  return !!r.confirmed;
+}
+window.w1Confirm = w1Confirm;
+
+/**
+ * 显示 sys.* 系统模态框，返回 Promise<{confirmed: bool, value?: string}>
+ * data 结构遵循 AippSystemWidget 规范（见 shared/aipp-protocol）
+ */
+function showSysModal(widgetType, data) {
+  return new Promise(resolve => {
+    _sysModalResolve = resolve;
+    const overlay  = document.getElementById('sys-modal-overlay');
+    const titleEl  = document.getElementById('sys-modal-title');
+    const msgEl    = document.getElementById('sys-modal-message');
+    const inputEl  = document.getElementById('sys-modal-input');
+    const btnsEl   = document.getElementById('sys-modal-buttons');
+
+    titleEl.textContent = data.title  || '';
+    msgEl.textContent   = data.message || '';
+    btnsEl.innerHTML    = '';
+    inputEl.style.display = 'none';
+    inputEl.value = '';
+
+    if (widgetType === 'sys.prompt') {
+      inputEl.placeholder   = data.placeholder || '';
+      inputEl.style.display = 'block';
+      setTimeout(() => inputEl.focus(), 50);
+    }
+
+    if (widgetType === 'sys.confirm') {
+      const mode    = data.mode || 'yes_no';
+      const isDanger = !!data.danger;
+      const yesLabel = data.confirmLabel
+        || (mode === 'ok_cancel' ? '确定' : '确认删除');
+      const noLabel  = data.cancelLabel || '取消';
+
+      const yesBtn = document.createElement('button');
+      yesBtn.className = `sys-modal-btn ${isDanger ? 'danger' : 'primary'}`;
+      yesBtn.textContent = yesLabel;
+      yesBtn.onclick = () => closeSysModal(true);
+
+      const noBtn = document.createElement('button');
+      noBtn.className = 'sys-modal-btn secondary';
+      noBtn.textContent = noLabel;
+      noBtn.onclick = () => closeSysModal(false);
+
+      btnsEl.appendChild(noBtn);
+      btnsEl.appendChild(yesBtn);
+    } else if (widgetType === 'sys.alert') {
+      const okBtn = document.createElement('button');
+      okBtn.className = 'sys-modal-btn primary';
+      okBtn.textContent = '确定';
+      okBtn.onclick = () => closeSysModal(true);
+      btnsEl.appendChild(okBtn);
+    } else if (widgetType === 'sys.prompt') {
+      const cancelBtn = document.createElement('button');
+      cancelBtn.className = 'sys-modal-btn secondary';
+      cancelBtn.textContent = '取消';
+      cancelBtn.onclick = () => closeSysModal(false);
+
+      const submitBtn = document.createElement('button');
+      submitBtn.className = 'sys-modal-btn primary';
+      submitBtn.textContent = '确定';
+      submitBtn.onclick = () => closeSysModal(true, inputEl.value.trim());
+      inputEl.onkeydown = e => { if (e.key === 'Enter') submitBtn.click(); };
+
+      btnsEl.appendChild(cancelBtn);
+      btnsEl.appendChild(submitBtn);
+    } else if (widgetType === 'sys.choice' || widgetType === 'sys.selection') {
+      (data.options || []).forEach(opt => {
+        const btn = document.createElement('button');
+        btn.className = opt.tool ? 'sys-modal-btn primary' : 'sys-modal-btn secondary';
+        btn.textContent = opt.label || '';
+        btn.onclick = () => closeSysModal(!!opt.tool, null, opt);
+        btnsEl.appendChild(btn);
+      });
+    }
+
+    overlay.classList.add('open');
+  });
+}
+
+function closeSysModal(confirmed, value, choiceOption) {
+  document.getElementById('sys-modal-overlay').classList.remove('open');
+  if (_sysModalResolve) {
+    _sysModalResolve({ confirmed, value, choiceOption });
+    _sysModalResolve = null;
+  }
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  if (typeof window.closeActionEditor === 'function') {
+    e.preventDefault();
+    window.closeActionEditor();
+    return;
+  }
+  if (typeof window.closeDecisionEditor === 'function') {
+    e.preventDefault();
+    window.closeDecisionEditor();
+    return;
+  }
+  const sysOverlay = document.getElementById('sys-modal-overlay');
+  if (sysOverlay?.classList.contains('open')) {
+    e.preventDefault();
+    closeSysModal(false);
+  }
+});
+
+/**
+ * 处理 canvas action=open 且 widget_type 为 sys.* 的指令。
+ * 渲染系统模态框，用户响应后自动通过 ToolProxy 执行 yes/submit 工具。
+ */
+async function handleSysWidgetCommand(widgetType, data) {
+  if (!data) return;
+  const { confirmed, value, choiceOption } = await showSysModal(widgetType, data);
+
+  if (widgetType === 'sys.confirm') {
+    if (confirmed && data.yes && data.yes.tool) {
+      await memProxyTool(data.yes.tool, data.yes.args || {});
+      window.dispatchEvent(new CustomEvent('aipp:tool-completed', { detail: { tool: data.yes.tool } }));
+      await ensureMemoryManagerVisibleAfterTool(data.yes.tool);
+    } else if (!confirmed && data.no && data.no.message) {
+      appendAssistantMessage(data.no.message);
+    }
+  } else if (widgetType === 'sys.alert') {
+    if (data.close_message) appendAssistantMessage(data.close_message);
+  } else if (widgetType === 'sys.prompt') {
+    if (confirmed && value !== null && data.submit && data.submit.tool) {
+      const args = { [data.submit.arg_name || 'value']: value };
+      await memProxyTool(data.submit.tool, args);
+    } else if (!confirmed && data.cancel && data.cancel.message) {
+      appendAssistantMessage(data.cancel.message);
+    }
+  } else if (widgetType === 'sys.choice' || widgetType === 'sys.selection') {
+    if (confirmed && choiceOption) {
+      if (choiceOption.tool) {
+        await memProxyTool(choiceOption.tool, choiceOption.args || {});
+      } else if (choiceOption.message) {
+        appendAssistantMessage(choiceOption.message);
+      }
+    }
+  }
+}
+
+// ── Apps Panel ─────────────────────────────────────────────────────────────
+
+let _appsLoaded = false;
+let _appsPreloadStarted = false;
+
+async function toggleAppsPanel() {
+  const panel = document.getElementById('apps-panel');
+  if (panel.classList.contains('open')) {
+    closeAppsPanel();
+  } else {
+    // Align panel bottom to the apps button bottom so content grows upward
+    const btn = document.getElementById('fb-apps');
+    const btnRect = btn.getBoundingClientRect();
+    const bottomPx = Math.max(8, window.innerHeight - btnRect.bottom);
+    panel.style.setProperty('--apps-panel-bottom', bottomPx + 'px');
+    panel.classList.add('open');
+    btn.classList.add('active');
+    if (!_appsLoaded) await loadApps();
+  }
+}
+
+function closeAppsPanel() {
+  const panel = document.getElementById('apps-panel');
+  if (!panel) return;
+  panel.classList.remove('open');
+  const btn = document.getElementById('fb-apps');
+  if (btn) btn.classList.remove('active');
+}
+
+function appsOverlayClick(e) {
+  if (e.target === document.getElementById('apps-overlay')) closeAppsPanel();
+}
+
+// 点面板外关闭
+document.addEventListener('click', function(e) {
+  const panel = document.getElementById('apps-panel');
+  const btn   = document.getElementById('fb-apps');
+  if (panel && panel.classList.contains('open') &&
+      !panel.contains(e.target) && btn && !btn.contains(e.target)) {
+    closeAppsPanel();
+  }
+}, true);
+
+async function loadApps() {
+  const iframe = document.getElementById('apps-iframe');
+  if (iframe && !iframe.src) iframe.src = '/api/system/widgets/app-list';
+  _appsLoaded = true;
+}
+
+function preloadAppsPanelSoon() {
+  if (_appsPreloadStarted) return;
+  _appsPreloadStarted = true;
+  const run = () => loadApps().catch(() => { _appsLoaded = false; _appsPreloadStarted = false; });
+  if ('requestIdleCallback' in window) requestIdleCallback(run, { timeout: 1200 });
+  else setTimeout(run, 250);
+}
+
+function scrollToBottom() {
+  const box = activeMessages();
+  if (box) box.scrollTop = box.scrollHeight;
+}
+
+// 从 Apps 面板直接打开 app（绕过 LLM，调用 /api/apps/{appId}/open）
+// toolName/toolArgs 可选：直接调用指定 skill（如点击世界卡片进入世界），与 LLM 路径一致
+async function openAppDirect(appId, toolName, toolArgs, existingSessionId) {
+  // widget submit 前，将当前活跃 widget 对应的 conversation message 标记为已处理。
+  // 此时 currentSessionId 仍是源 session（主 session），需在调用工具前执行。
+  await markActiveWidgetProcessed();
+
+  // App panel 是全局导航：若当前在 canvas mode，先退回主 session
+  if (isCanvasMode) exitCanvasMode();
+
+  // App-owned tool openings will emit session/canvas events; pre-switching here
+  // would mount stale canvas once before the real open response arrives.
+  if (toolName) {
+    // Widget submit should keep the response in the conversation that hosted the widget.
+    // Switching to app-{appId} here hides the follow-up html_widget from the user.
+  } else if (existingSessionId && sessionData[existingSessionId] && currentSessionId !== existingSessionId) {
+    await switchSession(existingSessionId);
+  } else {
+    // 若 app 已有专属 session（app-{appId}），先切换过去，避免 spinner 污染当前 session
+    const appSessionId = 'app-' + appId;
+    if (sessionData[appSessionId] && currentSessionId !== appSessionId) {
+      await switchSession(appSessionId);
+    }
+  }
+
+  const uiSessionId = currentSessionId || 'main';
+  // Show a "opening..." indicator in the (now correct) session
+  const msgDiv = addMessage('assistant', '');
+  const spinner = document.createElement('div');
+  spinner.style.cssText = 'display:flex;align-items:center;gap:8px;color:var(--text-dim);font-size:13px;padding:4px 0';
+  spinner.innerHTML = '<div class="hw-spinner"></div><span>正在打开…</span>';
+  msgDiv.appendChild(spinner);
+  scrollToBottom();
+
+  try {
+    // 传入 existingSessionId（若有）让 backend 使用对应世界的 agent loop
+    const reqBody = {};
+    if (toolName) { reqBody.tool_name = toolName; reqBody.tool_args = toolArgs || {}; }
+    reqBody.session_id = existingSessionId || uiSessionId;
+    const resp = await fetch(`/api/apps/${appId}/open`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(reqBody)
+    });
+    if (!resp.ok) throw new Error(resp.statusText);
+    const reader = resp.body.getReader();
+    const dec    = new TextDecoder();
+    let sseBuffer = '';
+    msgDiv.removeChild(spinner);
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      sseBuffer += dec.decode(value, { stream: true });
+      const lines = sseBuffer.split('\n');
+      sseBuffer = lines.pop(); // keep incomplete last line
+      for (const line of lines) {
+        if (!line.startsWith('data:')) continue;
+        try { handleSseEvent(JSON.parse(line.slice(5).trim()), msgDiv); } catch(e) {}
+      }
+    }
+    // flush any remaining buffered line
+    if (sseBuffer.startsWith('data:')) {
+      try { handleSseEvent(JSON.parse(sseBuffer.slice(5).trim()), msgDiv); } catch(e) {}
+    }
+    // Remove the placeholder msg if it ended up empty
+    if (!msgDiv.textContent.trim() && !msgDiv.querySelector('iframe')) {
+      msgDiv.remove();
+      // Also remove from sessionData to avoid stale messages
+      const prevSess = sessionData[uiSessionId];
+      if (prevSess && prevSess.messages && prevSess.messages.length > 0) {
+        prevSess.messages.pop();
+      }
+    }
+  } catch(e) {
+    spinner.innerHTML = '<span style="color:var(--danger)">打开失败：' + e.message + '</span>';
+  }
+}
+
+// 处理 Host 系统面板 iframe 发来的 postMessage（AIPP widgets 使用 hostApi）
+window.addEventListener('message', function(event) {
+  if (!event.data) return;
+
+  // ── app list widget：点击应用卡片 ──────────────────────────────────────
+  if (event.data.type === 'openApp') {
+    const { appId } = event.data;
+    if (!appId) return;
+    closeAppsPanel();           // panel 模式下关闭面板（chat 模式下安全忽略）
+    _currentAppId = appId;
+    openAppDirect(appId);
+    return;
+  }
+
+  // ── app list widget：iframe 上报内容高度，精确调整 panel 尺寸 ─────────
+  if (event.data.type === 'appListHeight') {
+    const panel  = document.getElementById('apps-panel');
+    const iframe = document.getElementById('apps-iframe');
+    if (!panel || !iframe) return;
+    const bottomPx   = parseFloat(panel.style.getPropertyValue('--apps-panel-bottom')) || 54;
+    const headerH    = 34;   // .apps-header 32px + 1px border
+    const maxPanelH  = window.innerHeight - bottomPx - 8;
+    const contentH   = event.data.height || 0;
+    const idealH     = contentH + headerH;
+    const finalH     = Math.min(idealH, maxPanelH);
+    panel.style.height  = finalH + 'px';
+    iframe.style.height = (finalH - headerH) + 'px';
+    return;
+  }
+
+});
+
+/** 当前活跃 app（点击 Apps 面板时设置，用于 hostApi fallback） */
+let _currentAppId = null;
+
+// ── html_widget 渲染（is_canvas_mode=false）────────────────────────────────
+
+/** 当前最后一条 html_widget 消息元素（用于 replace-last 逻辑）。 */
+let _lastHtmlWidgetEl = null;
+
+// ── Plan D：通用 widget 挂载（ESM）─────────────────────────────────────────
+//
+// AIPP 把 widget 实现成 ES module，export { mount(targetEl, hostApi, data) }。
+// host 不知道任何 widget 的内部细节，只负责：
+//   1. 从 _widgetManifests[widget_type].render.url 解析模块 URL
+//      （由 WidgetsEndpoint enrich 时附带的 app_base_url 解析为绝对地址）
+//   2. dynamic import 模块
+//   3. 构造 hostApi（callTool 等），调 mod.mount
+// 详见 aipp-protocol README §10.x — Widget Mount。
+
+/** 给 widget 提供的 host 能力。最小集，按需扩展。 */
+function makeHostApi({ widgetType, mountEl }) {
+  const manifest = _widgetManifests[widgetType] || {};
+  const appId = manifest.app_id || _currentAppId || '';
+  const callTool = (name, args) => {
+    const targetAppId = appId || _currentAppId;
+    // 复用现有 session-切换 + openAppDirect 逻辑
+    let existingUiSessionId = null;
+    if (args && args.session_id) {
+      const found = Object.values(sessionData).find(s => s.canvasSessionId === args.session_id);
+      if (found) existingUiSessionId = found.id;
+    }
+    return openAppDirect(targetAppId, name, args || {}, existingUiSessionId);
+  };
+  return {
+    /** 直接调用某 tool（绕开 LLM），用于 widget 内用户动作。 */
+    callTool,
+    async invokeAction(action, payload) {
+      if (!action || typeof action !== 'object') {
+        throw new Error('invalid submit action');
+      }
+      const kind = String(action.kind || '').toLowerCase();
+      if (kind === 'world_event_submit') {
+        const eventId = String(action.event_id || payload?.event?.id || '').trim();
+        if (!eventId) throw new Error('event_id is required for world_event_submit');
+        const resp = await fetch(`/api/world-events/${encodeURIComponent(eventId)}/submit`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ parameters: payload?.parameters || {} })
+        });
+        const body = await resp.json();
+        if (!resp.ok) {
+          return Object.assign({ status: 'failed', error: body?.error || body?.reason || 'submit failed' }, body || {});
+        }
+        const widgets = [body?.pre_widget, body?.widget || body?.resume_result?.html_widget, body?.final_widget]
+          .filter(Boolean);
+        return Object.assign({}, body, { widgets });
+      }
+      if (kind === 'tool') {
+        const name = String(action.name || '').trim();
+        if (!name) throw new Error('tool action requires name');
+        const baseArgs = action.args && typeof action.args === 'object' ? Object.assign({}, action.args) : {};
+        const merged = Object.assign(baseArgs, action.parameters_patch && typeof action.parameters_patch === 'object'
+          ? action.parameters_patch
+          : {});
+        if (payload?.parameters && typeof payload.parameters === 'object') {
+          merged.parameters = Object.assign({}, merged.parameters || {}, payload.parameters);
+        }
+        await callTool(name, merged);
+        return { status: 'success', widgets: [] };
+      }
+      throw new Error('unsupported action kind: ' + (action.kind || 'unknown'));
+    },
+    openApp(targetAppId) {
+      return openAppDirect(targetAppId);
+    },
+    markProcessed() {
+      return markActiveWidgetProcessed();
+    },
+    markProcessedWithData(payload) {
+      return markActiveWidgetProcessed(payload || {});
+    },
+    appendWidget(widgetPayload) {
+      const el = addMessage('assistant', '');
+      el.innerHTML = '';
+      el.className = 'msg assistant';
+      const json = typeof widgetPayload === 'string' ? widgetPayload : JSON.stringify(widgetPayload || {});
+      renderHtmlWidget(json, el);
+      const sess = sessionData[currentSessionId];
+      if (sess && sess.messages) {
+        const widgetMsg = { role: 'assistant', widgetJson: json, processed: el.dataset.processed === 'true' };
+        if (sess.messages.length > 0) sess.messages[sess.messages.length - 1] = widgetMsg;
+        else sess.messages.push(widgetMsg);
+      }
+      fetch(`/api/sessions/${currentSessionId}/messages/client`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: 'widget', widgetJson: json })
+      }).catch(() => {});
+      return Promise.resolve();
+    },
+    /** 直接 POST tool 到 AIPP（经 host /api/proxy 转发），返回 JSON。不触发任何 UI 转换。 */
+    async proxyTool(name, args) {
+      const ctx = { userId: 'default', sessionId: currentSessionId, agentId: 'worldone' };
+      const r = await fetch(`/api/proxy/tools/${name}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ args: args || {}, _context: ctx }),
+      });
+      return r.json();
+    },
+    widgetType,
+    appId,
+    appBaseUrl: manifest.app_base_url || '',
+    appProxyUrl(path) {
+      const suffix = String(path || '').startsWith('/') ? path : '/' + path;
+      return appId ? `/api/proxy/app/${encodeURIComponent(appId)}${suffix}` : suffix;
+    },
+    mountEl,
+    sessionId: currentSessionId,
+  };
+}
+
+/** 解析 widget manifest 的 render.url 为可 import 的绝对 URL。 */
+function _resolveWidgetUrl(manifest) {
+  const url = manifest?.render?.url;
+  if (!url) return null;
+  const rev = '20260521-memory-manager-reload';
+  const withRev = (u) => u.includes('?') ? `${u}&v=${rev}` : `${u}?v=${rev}`;
+  if (/^https?:\/\//.test(url)) return withRev(url);
+  const base = (manifest.app_base_url || '').replace(/\/$/, '');
+  return withRev(base + (url.startsWith('/') ? url : '/' + url));
+}
+
+/**
+ * 确保 canvas-area 内有 Plan-D 通用挂载容器；返回该 element。
+ * Creates the generic Plan-D mount target inside .canvas-area.
+ */
+function _ensureAippCanvasMount() {
+  let el = document.getElementById('aipp-canvas-mount');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'aipp-canvas-mount';
+    el.style.cssText = 'flex:1;min-width:0;height:100%;overflow:auto;background:var(--bg);';
+    const canvas = document.querySelector('.canvas-area');
+    if (canvas) canvas.appendChild(el);
+  }
+  el.style.display = 'block';
+  return el;
+}
+
+function _unmountAippCanvasMount() {
+  const el = document.getElementById('aipp-canvas-mount');
+  if (!el) return;
+  if (el._aippWidgetMod && typeof el._aippWidgetMod.unmount === 'function') {
+    try { el._aippWidgetMod.unmount(); } catch (_) {}
+    el._aippWidgetMod = null;
+  }
+  el.innerHTML = '';
+  el.style.display = 'none';
+}
+
+/** 通用挂载入口。被 renderHtmlWidget 检测到新 shape 时调用，也可被 canvas mode 复用。 */
+const _aippWidgetModuleCache = new Map();
+
+function preloadAippWidget(widgetType) {
+  const manifest = _widgetManifests[widgetType];
+  const url = _resolveWidgetUrl(manifest);
+  if (!url || _aippWidgetModuleCache.has(url)) return;
+  _aippWidgetModuleCache.set(url, import(/* @vite-ignore */ url).catch(e => {
+    _aippWidgetModuleCache.delete(url);
+    console.warn('[preloadAippWidget] failed', widgetType, e);
+    return null;
+  }));
+}
+
+function preloadCanvasWidgetsSoon() {
+  const run = () => Object.values(_widgetManifests)
+    .filter(w => w && w.is_canvas_mode && w.render && w.render.url)
+    .forEach(w => preloadAippWidget(w.type));
+  if ('requestIdleCallback' in window) requestIdleCallback(run, { timeout: 1500 });
+  else setTimeout(run, 300);
+}
+
+async function mountAippWidget(targetEl, widgetType, data) {
+  const manifest = _widgetManifests[widgetType];
+  const url = _resolveWidgetUrl(manifest);
+  console.log('[AIPP_ROUTE] step=widget_mount_start widget=%s url=%s data=', widgetType, url, data);
+  if (!url) {
+    targetEl.innerHTML = `<div style="color:#f88;font:13px monospace;padding:12px">`
+      + `widget "${widgetType}" missing render.url in manifest</div>`;
+    return;
+  }
+  // unmount previous widget instance if same target
+  if (targetEl._aippWidgetMod && typeof targetEl._aippWidgetMod.unmount === 'function') {
+    try { targetEl._aippWidgetMod.unmount(); } catch (_) {}
+  }
+  try {
+    let modulePromise = _aippWidgetModuleCache.get(url);
+    if (!modulePromise) {
+      modulePromise = import(/* @vite-ignore */ url);
+      _aippWidgetModuleCache.set(url, modulePromise);
+    }
+    const mod = await modulePromise;
+    if (!mod) throw new Error('widget module preload failed');
+    const api = makeHostApi({ widgetType, mountEl: targetEl });
+    mod.mount(targetEl, api, data);
+    const runtime = {
+      mod,
+      widgetType,
+      data: data || {},
+      hostApi: api,
+      mountEl: targetEl,
+      load: typeof mod.load === 'function' ? mod.load.bind(mod) : _defaultWidgetLoad,
+      generate: typeof mod.generate === 'function' ? mod.generate.bind(mod) : _defaultWidgetGenerate,
+    };
+    targetEl._aippWidgetRuntime = runtime;
+    const initialState = _normalizeWidgetState(runtime.data?.__widget_state);
+    if (initialState) {
+      try { await runtime.load(targetEl, initialState, runtime.data); } catch (_) {}
+    }
+    targetEl._aippWidgetMod = mod;
+    console.log('[AIPP_ROUTE] step=widget_mount_done widget=%s url=%s', widgetType, url);
+  } catch (e) {
+    console.error('[mountAippWidget] failed', widgetType, url, e);
+    targetEl.innerHTML = `<div style="color:#f88;font:13px monospace;padding:12px">`
+      + `Failed to load widget "${widgetType}": ${e.message}</div>`;
+  }
+}
+
+async function _collectActiveWidgetState(containerEl, explicitState) {
+  const normalized = _normalizeWidgetState(explicitState);
+  if (normalized) return normalized;
+  const mountEl = containerEl?.querySelector?.('.aipp-widget-mount');
+  const runtime = mountEl?._aippWidgetRuntime;
+  if (!runtime || typeof runtime.generate !== 'function') return null;
+  try {
+    const generated = await runtime.generate(runtime.mountEl || mountEl, runtime.data || {});
+    return _normalizeWidgetState(generated);
+  } catch (_) {
+    return null;
+  }
+}
+
+function _defaultWidgetGenerate(rootEl) {
+  const container = rootEl || document;
+  const fields = Array.from(container.querySelectorAll('[data-param]'));
+  if (!fields.length) return {};
+  const out = {};
+  let hasValue = false;
+  fields.forEach(el => {
+    const path = String(el.getAttribute('data-param') || '').trim();
+    if (!path) return;
+    const raw = _readFieldValue(el);
+    if (raw === '') return;
+    _setNestedByPath(out, path, raw);
+    hasValue = true;
+  });
+  return hasValue ? out : {};
+}
+
+function _defaultWidgetLoad(rootEl, state) {
+  const normalized = _normalizeWidgetState(state);
+  if (!normalized || !rootEl) return;
+  const fields = Array.from(rootEl.querySelectorAll('[data-param]'));
+  fields.forEach(el => {
+    const path = String(el.getAttribute('data-param') || '').trim();
+    if (!path) return;
+    const value = _readByPath(normalized, path);
+    if (value == null || typeof value === 'object') return;
+    if (el.type === 'checkbox') {
+      el.checked = value === true || String(value).toLowerCase() === 'true';
+    } else {
+      el.value = String(value);
+    }
+  });
+}
+
+function _readFieldValue(el) {
+  if (!el) return '';
+  if (el.type === 'checkbox') return el.checked ? 'true' : '';
+  return String(el.value ?? '').trim();
+}
+
+function _setNestedByPath(target, path, value) {
+  const parts = String(path || '').split('.').filter(Boolean);
+  if (!parts.length) return;
+  let cur = target;
+  for (let i = 0; i < parts.length - 1; i++) {
+    const k = parts[i];
+    if (!cur[k] || typeof cur[k] !== 'object') cur[k] = {};
+    cur = cur[k];
+  }
+  cur[parts[parts.length - 1]] = value;
+}
+
+function _readByPath(source, path) {
+  const parts = String(path || '').split('.').filter(Boolean);
+  let cur = source;
+  for (const p of parts) {
+    if (cur == null || typeof cur !== 'object') return undefined;
+    cur = cur[p];
+  }
+  return cur;
+}
+
+function renderHtmlWidget(json, containerMsgEl) {
+  let data;
+  try { data = typeof json === 'string' ? JSON.parse(json) : json; } catch(e) { return; }
+
+  if (data && data.widget_type) {
+    console.log('[AIPP_ROUTE] step=html_widget_received widget=%s title=%s data=', data.widget_type, data.title || '', data.data || {});
+    return _renderAippWidgetMessage(data, containerMsgEl);
+  }
+
+  const errorEl = document.createElement('div');
+  errorEl.className = 'widget-processed-card';
+  errorEl.style.color = 'var(--danger)';
+  errorEl.textContent = 'Invalid html_widget: missing widget_type for app-owned ESM renderer.';
+  containerMsgEl.classList.add('html-widget-msg');
+  containerMsgEl.appendChild(errorEl);
+  _injectWidgetActions(containerMsgEl);
+  containerMsgEl.dataset.widgetJson = typeof json === 'string' ? json : JSON.stringify(json);
+  delete containerMsgEl.dataset.processed;
+  _lastHtmlWidgetEl = containerMsgEl;
+  _lastHtmlWidgetSessionId = currentSessionId;
+  scrollToBottom();
+}
+
+/**
+ * Plan D 聊天卡片挂载：在消息元素里建一个 mount 目标 div，调通用 mountAippWidget。
+ * widget JS 直接渲染到 host DOM；Host 不理解 widget 内部 UI。
+ */
+function _renderAippWidgetMessage(data, containerMsgEl) {
+  const widgetType = data.widget_type;
+  const widgetData = data.data || {};
+
+  // replace-last：同一条消息上重复挂载就更新内容
+  let mountEl;
+  const bubble = _ensureAssistantWidgetBubble(containerMsgEl);
+  if (_lastHtmlWidgetEl && _lastHtmlWidgetEl === containerMsgEl) {
+    mountEl = bubble.querySelector('.aipp-widget-mount');
+    if (mountEl) {
+      mountAippWidget(mountEl, widgetType, widgetData);
+      containerMsgEl.dataset.widgetJson = typeof data === 'string' ? data : JSON.stringify(data);
+      delete containerMsgEl.dataset.processed;
+      return;
+    }
+  }
+
+  mountEl = document.createElement('div');
+  mountEl.className = 'aipp-widget-mount';
+  containerMsgEl.classList.add('html-widget-msg');
+  bubble.innerHTML = '';
+  bubble.appendChild(mountEl);
+
+  _injectWidgetActions(containerMsgEl);
+  containerMsgEl.dataset.widgetJson = typeof data === 'string' ? data : JSON.stringify(data);
+  delete containerMsgEl.dataset.processed;
+
+  mountAippWidget(mountEl, widgetType, widgetData);
+  _lastHtmlWidgetEl = containerMsgEl;
+  _lastHtmlWidgetSessionId = currentSessionId;
+  scrollToBottom();
+}
+
+function _ensureAssistantWidgetBubble(containerMsgEl) {
+  containerMsgEl.classList.remove('live-progress');
+  containerMsgEl.classList.add('msg', 'assistant', 'html-widget-msg');
+
+  let avatar = containerMsgEl.querySelector(':scope > .msg-avatar');
+  let body = containerMsgEl.querySelector(':scope > .msg-body');
+  let bubble = body?.querySelector(':scope > .msg-bubble');
+  if (avatar && body && bubble) return bubble;
+
+  avatar = avatar || document.createElement('div');
+  avatar.className = 'msg-avatar';
+  avatar.textContent = avatar.textContent || 'W';
+
+  body = document.createElement('div');
+  body.className = 'msg-body';
+  bubble = document.createElement('div');
+  bubble.className = 'msg-bubble';
+  body.appendChild(bubble);
+
+  containerMsgEl.innerHTML = '';
+  containerMsgEl.appendChild(avatar);
+  containerMsgEl.appendChild(body);
+  return bubble;
+}
+
+/**
+ * 从 widgetJson 中提取可读标题，用于"已处理"卡片的定语。
+ * 使用 json.title 字段。
+ */
+function _extractWidgetTitle(widgetJson) {
+  try {
+    const data = typeof widgetJson === 'string' ? JSON.parse(widgetJson) : widgetJson;
+    if (data.title) return data.title;
+  } catch (e) {}
+  return '';
+}
+
+function _widgetEventId(widgetJson) {
+  try {
+    const root = typeof widgetJson === 'string' ? JSON.parse(widgetJson) : widgetJson;
+    return root?.data?.event?.id || '';
+  } catch (_) {
+    return '';
+  }
+}
+
+function _normalizedConversationMessages(messages) {
+  if (!Array.isArray(messages) || messages.length <= 1) return messages || [];
+  const winner = new Map();
+  messages.forEach((m, idx) => {
+    if (!m || !m.widgetJson) return;
+    const eventId = _widgetEventId(m.widgetJson);
+    if (!eventId) return;
+    const prev = winner.get(eventId);
+    if (!prev) {
+      winner.set(eventId, { idx, score: _widgetReplayScore(m), hasProvided: _hasProvidedParameters(m) });
+      return;
+    }
+    const score = _widgetReplayScore(m);
+    const hasProvided = _hasProvidedParameters(m);
+    // Prefer replay-safe message first:
+    // 1) processed/readonly/submitted
+    // 2) contains provided parameters
+    // 3) latest index as tie-breaker
+    if (score > prev.score
+      || (score === prev.score && Number(hasProvided) > Number(prev.hasProvided))
+      || (score === prev.score && hasProvided === prev.hasProvided && idx > prev.idx)) {
+      winner.set(eventId, { idx, score, hasProvided });
+    }
+  });
+  return messages.filter((m, idx) => {
+    if (!m || !m.widgetJson) return true;
+    const eventId = _widgetEventId(m.widgetJson);
+    if (!eventId) return true;
+    return winner.get(eventId)?.idx === idx;
+  });
+}
+
+function _widgetReplayScore(msg) {
+  if (!msg || !msg.widgetJson) return 0;
+  if (msg.processed) return 3;
+  if (_isReadonlyWidgetJson(msg.widgetJson)) return 2;
+  return 1;
+}
+
+function _hasProvidedParameters(msg) {
+  try {
+    const root = typeof msg?.widgetJson === 'string' ? JSON.parse(msg.widgetJson) : (msg?.widgetJson || {});
+    const event = root?.data?.event || {};
+    const business = event?.business_data || {};
+    const provided = business?.provided_parameters || business?.resume_args?.parameters;
+    return !!(provided && typeof provided === 'object' && Object.keys(provided).length > 0);
+  } catch (_) {
+    return false;
+  }
+}
+
+function _findWidgetMessageIndex(sess, sourceWidgetJson) {
+  if (!sess || !Array.isArray(sess.messages) || !sourceWidgetJson) return -1;
+  for (let i = sess.messages.length - 1; i >= 0; i--) {
+    const msg = sess.messages[i];
+    if (!msg || !msg.widgetJson || msg.processed) continue;
+    if (msg.widgetJson === sourceWidgetJson) return i;
+  }
+  const sourceEventId = _widgetEventId(sourceWidgetJson);
+  if (sourceEventId) {
+    for (let i = sess.messages.length - 1; i >= 0; i--) {
+      const msg = sess.messages[i];
+      if (!msg || !msg.widgetJson || msg.processed) continue;
+      if (_widgetEventId(msg.widgetJson) === sourceEventId) return i;
+    }
+  }
+  return -1;
+}
+
+/**
+ * 构建"已处理"静态卡片，用于 widget 触发 canvas 切换后返回主 session 时显示。
+ * 不再渲染 widget，只显示一个轻量提示条。
+ */
+function _buildProcessedCard(widgetJson) {
+  const title = _extractWidgetTitle(widgetJson);
+  const label = title ? `${title} · 已在界面上打开` : '已在界面上打开';
+  const el = document.createElement('div');
+  el.className = 'msg assistant widget-processed-msg';
+  // 保存状态供 saveDomMessages 读取
+  el.dataset.widgetJson = typeof widgetJson === 'string' ? widgetJson : JSON.stringify(widgetJson);
+  el.dataset.processed  = 'true';
+  const av = document.createElement('div');
+  av.className = 'msg-avatar';
+  av.textContent = 'W';
+  const body = document.createElement('div');
+  body.className = 'msg-body';
+  body.innerHTML = `
+    <div class="widget-processed-card">
+      <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M2 8l4 4 8-8"/>
+      </svg>
+      <span>${label}</span>
+    </div>`;
+  // 保留删除功能
+  const icoTrash = `<svg viewBox="0 0 14 14" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3.5h10M5.5 3.5V2.5a.5.5 0 01.5-.5h2a.5.5 0 01.5.5v1M5.5 6v4.5M8.5 6v4.5M3 3.5l.7 7.2a.5.5 0 00.5.3h5.6a.5.5 0 00.5-.3L11 3.5"/></svg>`;
+  const actions = document.createElement('div');
+  actions.className = 'msg-actions';
+  actions.innerHTML = `<button class="msg-action-btn" title="删除" onclick="msgDelete(this)">${icoTrash}</button>`;
+  body.appendChild(actions);
+  el.appendChild(av);
+  el.appendChild(body);
+  return el;
+}
+
+/**
+ * 当用户通过 widget 触发 canvas 跳转时，将当前 session 中最后一个 widget 标记为"已处理"。
+ * 跳转前调用（此时 currentSessionId 仍是源 session）。
+ */
+let _lastHtmlWidgetSessionId = null; // 记录 widget 所属的 session
+async function markActiveWidgetProcessed(options = {}) {
+  if (!_lastHtmlWidgetEl || !_lastHtmlWidgetSessionId) return;
+  const sid = _lastHtmlWidgetSessionId;
+  const sess = sessionData[sid];
+  const sourceWidgetJson = _lastHtmlWidgetEl.dataset.widgetJson || '';
+  const widgetState = await _collectActiveWidgetState(_lastHtmlWidgetEl, options?.widgetState);
+  const readonlyWidgetJson = _toReadonlyWidgetJson(sourceWidgetJson, {
+    providedParameters: options?.providedParameters,
+    widgetState
+  });
+  const idx = _findWidgetMessageIndex(sess, sourceWidgetJson);
+  let persistedByPatch = false;
+  if (sess && sess.messages) {
+    if (idx >= 0 && sess.messages[idx] && sess.messages[idx].widgetJson) {
+      sess.messages[idx].widgetJson = readonlyWidgetJson;
+      sess.messages[idx].processed = true;
+      persistedByPatch = true;
+    } else {
+      // Fallback: keep conversation-level submitted artifact even when index
+      // mapping fails (e.g. stale local order). Refresh path dedupes by event id.
+      sess.messages.push({ role: 'assistant', widgetJson: readonlyWidgetJson, processed: true });
+    }
+  }
+  // processed 是 conversation message state；按消息 index 更新，不修改 widget JSON。
+  let patchOk = false;
+  if (idx >= 0) {
+    try {
+      const r = await fetch(`/api/sessions/${sid}/messages/${idx}/state`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ processed: true, widget_json: readonlyWidgetJson })
+      });
+      const body = await r.json().catch(() => ({}));
+      patchOk = r.ok && body && body.ok === true;
+    } catch (_) {
+      patchOk = false;
+    }
+  }
+  if (!persistedByPatch || !patchOk) {
+    fetch(`/api/sessions/${sid}/messages/client`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role: 'widget', widgetJson: readonlyWidgetJson })
+    }).catch(() => {});
+  }
+  // 立即更新 DOM（如果还在当前视图）：保留原 widget，仅切只读态。
+  _applyReadonlyWidgetState(_lastHtmlWidgetEl, readonlyWidgetJson);
+  _lastHtmlWidgetEl = null;
+  _lastHtmlWidgetSessionId = null;
+}
+
+/** 将活跃 widget 容器切为只读态（保持原卡片，不改成勾选提示）。 */
+function _applyReadonlyWidgetState(el, readonlyWidgetJson) {
+  if (!el) return;
+  const json = readonlyWidgetJson || el.dataset.widgetJson || '';
+  el.innerHTML = '';
+  el.className = 'msg assistant';
+  renderHtmlWidget(json, el);
+  el.dataset.widgetJson = json;
+  el.dataset.processed = 'true';
+}
+
+/** 在 widget 容器右上角注入删除按钮（若尚未注入）。 */
+function _injectWidgetActions(containerMsgEl) {
+  if (containerMsgEl.querySelector('.widget-actions')) return; // 幂等
+  const icoTrash = `<svg viewBox="0 0 14 14" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3.5h10M5.5 3.5V2.5a.5.5 0 01.5-.5h2a.5.5 0 01.5.5v1M5.5 6v4.5M8.5 6v4.5M3 3.5l.7 7.2a.5.5 0 00.5.3h5.6a.5.5 0 00.5-.3L11 3.5"/></svg>`;
+  const bar = document.createElement('div');
+  bar.className = 'widget-actions';
+  bar.innerHTML = `<button class="msg-action-btn" title="删除" onclick="msgDeleteWidget(this)">${icoTrash}</button>`;
+  containerMsgEl.appendChild(bar);
+}
+
+/** 删除整个 widget 消息。 */
+function msgDeleteWidget(btn) {
+  if (isStreaming) return;
+  const el = btn.closest('.msg');
+  if (!el) return;
+  const idx = _removeFromSession(el);
+  el.remove();
+  // widget 不在 DB 里，range 接口调用无害（服务端找不到会静默忽略）
+  if (idx >= 0) {
+    fetch(`/api/sessions/${currentSessionId}/messages/range?from=${idx}&count=1`,
+      { method: 'DELETE' }).catch(() => {});
+  }
+}
+
+function applyPreset() {
+  const p = PRESETS[document.getElementById('s-provider').value];
+  if (!p) return;
+  document.getElementById('s-baseurl').value = p.baseUrl;
+  document.getElementById('s-model').value   = p.model;
+}
+
+function detectPreset(url) {
+  const sel = document.getElementById('s-provider');
+  if (!url) return;
+  sel.value = url.includes('deepseek') ? 'deepseek' : url.includes('openai') ? 'openai' : 'custom';
+}
+
+function renderEnvVarRows(rows) {
+  const list = document.getElementById('s-envvars-list');
+  if (!list) return;
+  list.innerHTML = '';
+  (rows || []).forEach(row => appendEnvVarRow(row));
+  toggleEnvVarEmpty();
+}
+
+function appendEnvVarRow(row = {}) {
+  const list = document.getElementById('s-envvars-list');
+  if (!list) return;
+  const key = row.key || row.name || '';
+  const globalValue = row.globalValue || '';
+  const appValues = row.appValues || {};
+  const rowEl = document.createElement('div');
+  rowEl.className = 'envvar-row';
+  rowEl.innerHTML = `
+    <div class="envvar-head">
+      <input class="form-input envvar-key" type="text" placeholder="${t('settings.envKeyPlaceholder')}" value="${esc(key)}">
+      <input class="form-input envvar-global" type="text" placeholder="${t('settings.envGlobalPlaceholder')}" value="${esc(globalValue)}">
+      <button type="button" class="btn-inline danger" title="${t('settings.removeEnvVar')}" onclick="removeEnvVarRow(this)">✕</button>
+    </div>
+    <div class="envvar-overrides"></div>
+    <div>
+      <button type="button" class="btn-inline" onclick="addEnvOverride(this.closest('.envvar-row'))" data-i18n="settings.addAppOverride">+ App 覆盖</button>
+    </div>
+  `;
+  list.appendChild(rowEl);
+  const overridesEl = rowEl.querySelector('.envvar-overrides');
+  Object.entries(appValues || {}).forEach(([appId, value]) => {
+    appendEnvOverrideItem(overridesEl, appId, value);
+  });
+  applyI18n();
+  toggleEnvVarEmpty();
+}
+
+function removeEnvVarRow(btn) {
+  const row = btn?.closest('.envvar-row');
+  if (row) row.remove();
+  toggleEnvVarEmpty();
+}
+
+function addEnvVarRow() {
+  appendEnvVarRow({});
+}
+
+function addEnvOverride(rowEl) {
+  if (!rowEl) return;
+  const overridesEl = rowEl.querySelector('.envvar-overrides');
+  appendEnvOverrideItem(overridesEl, '', '');
+}
+
+function appendEnvOverrideItem(container, appId, value) {
+  if (!container) return;
+  const item = document.createElement('div');
+  item.className = 'envvar-override-item';
+  const options = ['<option value=""></option>'].concat(
+    _settingsApps.map(a => `<option value="${esc(a.appId)}">${esc(a.appName)} (${esc(a.appId)})</option>`)
+  ).join('');
+  item.innerHTML = `
+    <select class="form-select envvar-app">${options}</select>
+    <input class="form-input envvar-app-value" type="text" placeholder="${t('settings.envAppValuePlaceholder')}" value="${esc(value || '')}">
+    <button type="button" class="btn-inline danger" title="${t('settings.removeOverride')}" onclick="this.closest('.envvar-override-item').remove()">✕</button>
+  `;
+  const sel = item.querySelector('.envvar-app');
+  if (appId) sel.value = appId;
+  container.appendChild(item);
+}
+
+function toggleEnvVarEmpty() {
+  const list = document.getElementById('s-envvars-list');
+  const empty = document.getElementById('s-envvars-empty');
+  if (!list || !empty) return;
+  empty.style.display = list.children.length ? 'none' : '';
+}
+
+function readEnvVarsFromUi() {
+  const rows = [];
+  document.querySelectorAll('#s-envvars-list .envvar-row').forEach(rowEl => {
+    const key = rowEl.querySelector('.envvar-key')?.value?.trim() || '';
+    if (!key) return;
+    const globalValue = rowEl.querySelector('.envvar-global')?.value?.trim() || '';
+    const appValues = {};
+    rowEl.querySelectorAll('.envvar-override-item').forEach(item => {
+      const appId = item.querySelector('.envvar-app')?.value?.trim() || '';
+      const value = item.querySelector('.envvar-app-value')?.value?.trim() || '';
+      if (appId && value) appValues[appId] = value;
+    });
+    rows.push({ key, globalValue, appValues });
+  });
+  return rows;
+}
+
+async function saveSettings() {
+  const body = settingsBody();
+  const res = await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(r=>r.json());
+  showTestResult(res.ok, res.message);
+  if (res.ok) {
+    applyRuntimeEnvFromSettings(body.envVars || []);
+    updateStatusDot(true);
+    updateSettingsBtn(!!body.apiKey);
+    setTimeout(closeSettings,700);
+  }
+}
+
+async function testConnection() {
+  const btn = document.getElementById('btn-test');
+  btn.textContent = t('settings.testingBtn'); btn.disabled = true;
+  document.getElementById('test-result').style.display = 'none';
+  try {
+    await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(settingsBody())});
+    const res = await fetch('/api/settings/test',{method:'POST'}).then(r=>r.json());
+    showTestResult(res.ok, res.message);
+    updateStatusDot(res.ok); updateSettingsBtn(res.ok);
+  } catch(e) { showTestResult(false, t('error.connect') + e.message); }
+  btn.textContent = t('settings.testBtn'); btn.disabled = false;
+}
+
+function settingsBody() {
+  return {
+    apiKey:         document.getElementById('s-apikey').value.trim(),
+    baseUrl:        document.getElementById('s-baseurl').value.trim(),
+    model:          document.getElementById('s-model').value.trim(),
+    timeoutSeconds: parseInt(document.getElementById('s-timeout').value)||120,
+    envVars:        readEnvVarsFromUi(),
+  };
+}
+
+function resolveRuntimeEnvFromEnvVars(envVars) {
+  const rows = Array.isArray(envVars) ? envVars : [];
+  for (const row of rows) {
+    const key = String(row?.key || '').trim().toLowerCase();
+    if (key !== 'env') continue;
+    const v = String(row?.globalValue || '').trim().toLowerCase();
+    if (v === 'production' || v === 'staging' || v === 'draft') return v;
+  }
+  return 'production';
+}
+
+function applyRuntimeEnvFromSettings(envVars) {
+  // Retained for settings compatibility; runtime execution is owned by widgets/apps.
+  window.RUNTIME_ENV = resolveRuntimeEnvFromEnvVars(envVars);
+}
+
+function showTestResult(ok, msg) {
+  const el = document.getElementById('test-result');
+  el.className = 'test-result ' + (ok?'ok':'fail');
+  el.textContent = (ok?'✓ ':'✗ ') + msg;
+  el.style.display = 'block';
+}
+
+function updateStatusDot(ok) {
+  document.getElementById('status-dot').className = 'status-dot '+(ok?'ok':'fail');
+  document.getElementById('status-text').textContent = ok ? t('settings.configured') : t('settings.notConfigured');
+}
+
+function updateSettingsBtn(configured) {
+  document.getElementById('fb-settings').classList.toggle('unconfigured', !configured);
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+// Cache of widget manifests keyed by widget type, loaded once at startup
+let _widgetManifests = {};
+
+(async () => {
+  applyI18n();
+  try {
+    const cfg = await fetch('/api/settings').then(r=>r.json());
+    applyRuntimeEnvFromSettings(cfg.envVars || []);
+    updateSettingsBtn(cfg.configured);
+    if (!cfg.configured) setTimeout(openSettings, 800);
+  } catch(e) {}
+
+  // Load widget manifests once so upload / other capabilities are available
+  try {
+    const wData = await fetch('/api/widgets').then(r => r.json());
+    (wData.widgets || []).forEach(w => {
+      if (w.type) _widgetManifests[w.type] = w;
+    });
+    preloadCanvasWidgetsSoon();
+    preloadAppsPanelSoon();
+  } catch(e) {}
+
+  await loadSessions();
+  await loadPendingEvents();
+  setInterval(loadPendingEvents, 10000);
+  // Widget modules perform their own mount-time initialization.
+
+  // Load and restore history for the current session (main) on startup.
+  // switchSession short-circuits when target === current, so we do it here.
+  const initSess = sessionData[currentSessionId];
+  if (initSess && !initSess.messages.length) {
+    try {
+      const resp = await fetch(`/api/sessions/${currentSessionId}/messages`);
+      if (resp.ok) {
+        const { messages } = await resp.json();
+        initSess.messages = (messages || []).map(m => {
+          if (m.role === 'widget') return { role: 'assistant', widgetJson: m.widgetJson, processed: m.processed === true };
+          return { role: m.role, html: md(m.content) };
+        });
+        // If we loaded real history, don't show the welcome hint
+        if (initSess.messages.length > 0) initSess.showWelcome = false;
+      }
+    } catch(e) {}
+  }
+  restoreMessages(initSess || { messages: [], id: currentSessionId, showWelcome: true });
+  updateCanvasSessionLabel();
+  setReadOnlyMode(false); // main session is always active
+})();
+</script>
+</body>
+</html>
